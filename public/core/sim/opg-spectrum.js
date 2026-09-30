@@ -179,6 +179,20 @@ function scenarioCompositionEvolved(mode, elapsedS, _pressureMbar, trendMbarPerS
 }
 
 /**
+ * The species fractions behind a synthetic spectrum (the composition step of
+ * `simulateOpticalSpectrum`, without the line shapes). The OPG550 emulator uses it to answer
+ * RGD partial pressures consistently with the spectrum it sends.
+ * @param {number} pressureMbar @param {number} trendMbarPerS @param {number} elapsedS @param {string} mode
+ * @returns {Record<string, number>}
+ */
+export function opticalComposition(pressureMbar, trendMbarPerS, elapsedS, mode) {
+  const m = normalizeSpectrumMode(mode);
+  return m === SpectrumMode.AUTO
+    ? autoComposition(pressureMbar, trendMbarPerS, elapsedS)
+    : scenarioCompositionEvolved(m, elapsedS, pressureMbar, trendMbarPerS);
+}
+
+/**
  * Normalised optical intensities over wavelength (CSC `simulate_optical_spectrum`).
  * Returns `samples` points spanning wavelengthMinNm..wavelengthMaxNm (CSC's OPG view uses
  * 303.05–876.07 nm with 288 samples; the function defaults are 380–780 nm, 401 samples).
@@ -191,11 +205,7 @@ function scenarioCompositionEvolved(mode, elapsedS, _pressureMbar, trendMbarPerS
  */
 export function simulateOpticalSpectrum(pressureMbar, trendMbarPerS, elapsedS, mode, options = {}) {
   const { wavelengthMinNm = 380.0, wavelengthMaxNm = 780.0 } = options;
-  const m = normalizeSpectrumMode(mode);
-  const composition =
-    m === SpectrumMode.AUTO
-      ? autoComposition(pressureMbar, trendMbarPerS, elapsedS)
-      : scenarioCompositionEvolved(m, elapsedS, pressureMbar, trendMbarPerS);
+  const composition = opticalComposition(pressureMbar, trendMbarPerS, elapsedS, mode);
 
   // A rising pressure trend amplifies ingress signatures.
   const ingress = clamp(Math.log10(1.0 + Math.max(trendMbarPerS, 0.0) * 2e5), 0.0, 1.0);

@@ -225,7 +225,7 @@ function transact(emulator, codec, command, value) {
 
 test("round trip: OPG550 spec against the emulator (identification and pressure)", () => {
   const codec = createP3V02Codec(opgSpec());
-  const emu = createP3V02Emulator({ product: "OPG550", manufacturer: "INFICON", serial: "55009876", firmware: "1.20", pressure: () => 4.2e-4 });
+  const emu = createP3V02Emulator({ product: "OPG550", manufacturer: "INFICON", serial: "55009876", firmware: "1.20", pressure: () => 4.2e-4, ignitionDelayMs: 0 });
   assert.equal(emu.baudRate, 115200);
   assert.equal(transact(emu, codec, "product_name").formatted, "OPG550");
   assert.equal(transact(emu, codec, "manufacturer_name").formatted, "INFICON");

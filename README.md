@@ -19,6 +19,13 @@ The design, the sources behind every protocol figure and the open verification i
   - a trend.
 - **Terminal.** Quick buttons send any read in one click, and pencil buttons load a write into the composer. In the composer you pick a command, choose Read or Write, and then pick a value from a list worked out from the spec (options, ranges, the accepted words in the description) or type your own. Pressures can be entered in any unit. The exact bytes and the risk class show before sending. You can pin a command and value as a quick button, reuse recent commands, recall earlier raw frames with ↑/↓, filter or copy the log, and switch between ASCII and hex views. The raw frame builder computes checksums and CRCs and flags a bad frame before it is sent.
 - **Setpoint editor** (SKY CDG and PPG550/570). Each switch-on and switch-off level can be dragged on the plot, moved together by dragging the shaded hysteresis band, set with a slider, nudged with ± buttons, the arrow keys or the mouse wheel, or typed as a pressure (or, on a CDG, as the raw byte). The hysteresis can be typed as a percentage or picked from presets. An illustrative vacuum cycle (pump-down into a valley, a gas burst, a vent) shows where each relay switches, with relay-state lanes underneath showing it hold inside the band. It also shows the live pressure. Apply writes only what changed, after one danger confirmation, and then verifies by reading back.
+- **Spectrum Studio** (OPG550). The OPG550's tab has a Gauge / Spectrum Studio switch. The studio offers four main plots:
+  - *Raw Spectrum:* the spectrum, with signature lines for tracked gases.
+  - *Rate of Rise:* dP/dt, or the rate of each tracked gas.
+  - *Residual Gas Detection:* tracked-gas partial pressures.
+  - *Advanced Analysis:* any two pressure sources in the session, with the band between them and a gas partial pressure on the right axis.
+
+  One hover bar keeps the x value at the far left and shows Δ(A−B) and Δ% at the cursor. Every history covers the whole session. Plasma on or off and starting SPEC, RoR or RGD are confirmed writes; after that the studio reads the latest record every 2 s. Ignition thresholds are shown in the display unit but stored and evaluated in mbar. When the pressure crosses one, the studio prompts you rather than switching the plasma itself. Exports: CSC's RGD and RoR CSV layout, plus one CSV per chart.
 - **Combined view** in overlay, stacked or grid layout, with visibility toggles, per-device colours and synchronised navigation.
 - **Sessions** autosave to this browser's IndexedDB, and can be exported and imported as JSON.
 - **Exports:** measurement CSV (per device, or merged on the union of timestamps), traffic CSV with exact bytes, a readable transcript, and session JSON. Every export header records the build, each device's model, address and full scale, and where the full scale came from.
@@ -39,7 +46,7 @@ The design, the sources behind every protocol figure and the open verification i
 | PxG55x binary, RS232C and RS485C | PSG550, PCG550 | Implemented from the OEM protocol description (🟠 needs a bench check, see below) |
 | PPG ASCII | PPG550, PPG570 | Ported one-to-one from CSC |
 | Pfeiffer ASCII | BCG450, TC600 | Ported one-to-one from CSC |
-| INFICON P3 V02 | OPG550 | Codec and identification ported. Spectrum Studio is not ported yet |
+| INFICON P3 V02 | OPG550 | Codec, identification and Spectrum Studio ported from CSC (🟠 record layouts and plasma limits need a bench check, V13 and V20) |
 | Others CSC routes | BCG552, BPG, MAG, MPG, HPG400, PEG100, PSG500 | Experimental, as in CSC |
 
 Out of scope: fieldbus variants (EtherCAT, Profibus, DeviceNet, Profinet), analog readout, Firefox and Safari (neither has Web Serial), and the VGC controllers, which the VGC tool covers.
@@ -62,7 +69,7 @@ Out of scope: fieldbus variants (EtherCAT, Profibus, DeviceNet, Profinet), analo
 1. Open the live page in desktop Chrome or Edge, or run it locally (next section).
 2. Click **Add gauge**, then **Grant a port…** and pick your USB serial adapter. The browser asks once per adapter.
 3. Click **Scan granted ports**, select what was found, confirm the model, the interface and address, and for a CDG the full scale.
-4. Click **Try demo** to explore everything with three simulated gauges.
+4. Click **Try demo** to explore everything with four simulated gauges, including an OPG550 for Spectrum Studio.
 
 Press `Ctrl K` to open the command dictionary for the current device.
 
@@ -74,7 +81,7 @@ Web Serial needs a secure context, and `http://localhost` counts as one. Double-
 |---|---|
 | `npm run app` | Same as the launchers |
 | `npm run dev` | Development server |
-| `npm test` | Spec validation, source validation, and the framer, codec, scan, scheduler, simulation and store suites (Node, no browser, no hardware) |
+| `npm test` | Spec validation, source validation, and the framer, codec, scan, scheduler, simulation, store, setpoint and Spectrum Studio suites (Node, no browser, no hardware) |
 | `npm run build:pages` | Static build for GitHub Pages (base path from `GITHUB_REPOSITORY`) |
 | `npm run preview:pages` | Serve the Pages build at `http://127.0.0.1:4173/Vacuum-Control-Serial-Communicator/` |
 | `npm run test:browser` | Headless Edge/Chrome smoke test of the demo against `SMOKE_URL` |
@@ -94,6 +101,7 @@ public/core/            framework-free ES modules, tested in Node
   store/                typed-array sample buffers, IndexedDB, session model, exports
   sim/                  simulation engine (ported from CSC) and protocol emulators
   turbo/                TC600 protocol
+  opg/                  Spectrum Studio model (spike filter, gas history, plasma thresholds) and its CSV exports
 public/ui/, public/app.js   plain-DOM UI
 app/                    Vinext page shell (same stack and versions as the VGC tool)
 specs-src/              device YAML synced from CSC, plus web-overlay.yaml (risk, source, notes)
@@ -109,6 +117,7 @@ Items marked 🟠 come from a document other than the INFICON primary document f
 - **V6–V8:** the CDG status byte, the setpoint write encoding and the stream rate, from TIRA49E1. The setpoint editor uses CSC's cube law, p = FS·(raw/255)³, until V7 is checked.
 - **V14:** for the PPG550/570, whether the setpoint hysteresis register holds the absolute release pressure or an offset from the setpoint. The editor lets you pick either and defaults to the absolute pressure.
 - **V15:** Web Serial behaviour in a soak test.
+- **V20:** OPG550 plasma ignition limits and the meaning of the record request data; the simulated OPG550's ignition limit, record cadence and analog-output scaling are illustrative.
 
 ## Privacy and disclaimer
 

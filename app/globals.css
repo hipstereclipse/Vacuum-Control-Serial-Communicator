@@ -513,9 +513,61 @@ dialog::backdrop { background: var(--modal-backdrop); }
 .meter { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .meter > span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-3), var(--brand)); transition: width 0.4s; }
 
+/* Device tab views (OPG550: Gauge / Spectrum Studio) */
+.device-overview { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.view-switch { margin-left: 4px; }
+
+/* Spectrum Studio */
+.studio { display: grid; gap: 14px; min-width: 0; }
+.studio-intro { display: flex; align-items: flex-start; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.studio-intro h3 { margin: 0; font-size: 17px; color: var(--accent); }
+.studio-intro p { margin: 2px 0 0; }
+.studio-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(300px, 1.25fr); gap: 16px; align-items: start; }
+.studio-charts { display: grid; gap: 14px; min-width: 0; }
+.studio-chart .card-title { flex-wrap: wrap; row-gap: 6px; }
+.studio-chart .card-title select { font-size: 13px; padding: 2px 6px; }
+.studio-chart .card-title label.row { text-transform: none; letter-spacing: 0; font-weight: 400; gap: 6px; }
+.studio-desc { margin: -4px 0 8px; font-style: italic; }
+.studio-side { display: grid; gap: 12px; min-width: 0; }
+.studio-side-card { display: grid; gap: 9px; align-content: start; }
+.studio-side-card .card-title { margin-bottom: 2px; }
+.studio-subtitle { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+.studio-form { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 14px; }
+.studio-form label, .studio-label { color: var(--muted); font-weight: 700; font-size: 13px; }
+.studio-form select { min-width: 0; width: 100%; }
+.studio-thresholds { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.studio-thresholds input { width: 120px; font-family: var(--mono); }
+.studio-check { font-size: 13.5px; align-items: flex-start; flex-wrap: nowrap; }
+.studio-check input { margin-top: 3px; flex: none; }
+.studio-note { margin: 0; font-size: 12.5px; }
+.studio-prompt { display: grid; gap: 8px; }
+.studio-plasma-status { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.studio-acq-status { display: grid; gap: 6px; font-size: 14px; }
+.studio-gases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.studio-gas { display: flex; align-items: center; gap: 7px; font-size: 14px; cursor: pointer; }
+.studio-gas .swatch, .studio-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.studio-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.studio-actions .button { width: 100%; }
+.studio-metric { font: 700 26px/1.1 var(--mono); color: var(--accent); }
+.studio-metric .u { font: 400 15px var(--sans); color: var(--muted); }
+.studio-molecules { margin: 2px 0 0; font-size: 13.5px; }
+.studio-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.studio-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.studio-delta { margin-top: 8px; font: 600 13px var(--mono); overflow-wrap: anywhere; }
+.studio-hoverbar {
+  position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline;
+  padding: 7px 12px; min-height: 34px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); box-shadow: var(--shadow-sm); font: 12.5px/1.4 var(--mono);
+}
+.studio-hoverbar .hb-x { order: -1; min-width: 150px; }
+.studio-hoverbar .hint { font-family: var(--sans); }
+.xy-chart { position: relative; }
+.xy-canvas { display: block; width: 100%; border-radius: var(--radius-sm); background: var(--chart-bg); border: 1px solid var(--line); cursor: crosshair; touch-action: none; }
+
 @media (max-width: 1100px) {
   .hero, .split, .split.wide-left { grid-template-columns: 1fr; }
   .sp-editor { grid-template-columns: 1fr; }
+  .studio-body { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; }

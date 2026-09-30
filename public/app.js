@@ -29,8 +29,12 @@ import { createPpgEmulator } from "./core/sim/emulators/ppg.js";
 import { createPfeifferAsciiEmulator } from "./core/sim/emulators/pfeiffer-ascii.js";
 import { createP3V02Emulator } from "./core/sim/emulators/p3v02.js";
 import { createTc600Codec } from "./core/turbo/tc600.js";
+import { OpgStudioState, PLASMA_DEFAULTS, RECORD_COMMANDS, COUNT_FOR_RECORD, STATE_FOR_RECORD } from "./core/opg/spectrum-studio.js";
+import { SpectrumMode } from "./core/sim/opg-spectrum.js";
 
 const TRAFFIC_CAP = 100000;
+const OPG_TICK_MS = 500;
+const PLASMA_SETTINGS_KEY = "gauge-communicator-opg-plasma";
 const LOG_CAP = 2000;
 const AUTOSAVE_MS = 10000;
 const store = {
@@ -109,7 +113,10 @@ const app = {
   setpointLayout,
   openDictionary,
   exportDevice,
+  exportHeader,
+  fileStem,
   changeFullScale,
+  savePlasmaSettings,
   simulation
 };
 
@@ -195,6 +202,7 @@ async function boot() {
     navigator.serial.addEventListener("connect", (/** @type {any} */ e) => onPortConnect(e.target ?? e.port));
   }
   setInterval(autosave, AUTOSAVE_MS);
+  setInterval(opgTick, OPG_TICK_MS);
   window.addEventListener("beforeunload", () => void autosave());
   requestPersistence();
   render();
@@ -423,10 +431,41 @@ function emulatorFor(spec, gauge, fullScaleMbar) {
   }
   if (model === "PCG550" || model === "PSG550") return createPxgEmulator({ model, pressure, baudRate: spec.transport.default_baud });
   if (model.startsWith("PPG")) return createPpgEmulator({ model, pressure, status: () => gauge.status() });
-  if (model === "OPG550") return createP3V02Emulator({ product: "OPG550", pressure });
+  if (model === "OPG550") {
+    const spectrum = () => {
+      const sp = simulation().spectrum({ mode: spectrumModeFor(simulation().state()) });
+      return { intensities: sp.intensities, composition: sp.composition, trendMbarPerS: sp.trendMbarPerS };
+    };
+    return createP3V02Emulator({ product: "OPG550", pressure, spectrum });
+  }
   if (model === "TC600") return createPfeifferAsciiEmulator({ model: "TC600", params: { 349: "TC 600" } });
   if (model === "BCG450") return createPfeifferAsciiEmulator({ model: "BCG450", pressure });
   throw new Error(`No emulator for ${model}. Simulated models: ${SIMULATABLE.join(", ")}`);
+}
+
+/**
+ * Composition behind a simulated OPG550's spectrum: helium for a helium environment, humid or
+ * dry air for a leak, otherwise the pressure-driven AUTO model.
+ * @param {any} s simulation state
+ */
+function spectrumModeFor(s) {
+  if (String(s.gas).toUpperCase() === "HE") return SpectrumMode.HELIUM_LEAK;
+  if (String(s.pattern).toUpperCase() === "LEAK") return String(s.humidity).toUpperCase() === "HIGH" ? SpectrumMode.WATER_LEAK : SpectrumMode.AIR_LEAK;
+  return SpectrumMode.AUTO;
+}
+
+function loadPlasmaSettings() {
+  const v = store.get(PLASMA_SETTINGS_KEY, {});
+  return {
+    autoEnabled: typeof v.autoEnabled === "boolean" ? v.autoEnabled : PLASMA_DEFAULTS.autoEnabled,
+    minIgnitionMbar: v.minIgnitionMbar > 0 ? v.minIgnitionMbar : PLASMA_DEFAULTS.minIgnitionMbar,
+    maxSafeMbar: v.maxSafeMbar > 0 ? v.maxSafeMbar : PLASMA_DEFAULTS.maxSafeMbar
+  };
+}
+
+/** Plasma thresholds persist per browser, in mbar (CSC keeps them in QSettings "opg/..."). @param {OpgStudioState} s */
+function savePlasmaSettings(s) {
+  store.set(PLASMA_SETTINGS_KEY, { autoEnabled: s.plasma.autoEnabled, minIgnitionMbar: s.plasma.minMbar, maxSafeMbar: s.plasma.maxMbar });
 }
 
 /** @param {any} o */
@@ -435,8 +474,13 @@ function createDevice(o) {
   const sameModel = [...state.devices.values()].filter((d) => d.model === o.spec.model).length;
   const turbo = o.spec.model === "TC600";
   const primary = turbo ? "actual_speed_hz" : o.poll.commands.includes("pressure") || o.codec.supportsContinuousOutput() ? "pressure" : o.poll.commands[0];
+  const id = o.id ?? `dev-${Date.now().toString(36)}-${index}`;
   return {
-    id: o.id ?? `dev-${Date.now().toString(36)}-${index}`,
+    id,
+    /** Spectrum Studio model, for OPG550s only; fed from every reading and reply of the device. */
+    opg: o.spec.model === "OPG550" ? new OpgStudioState({ id, t0: Date.now(), plasma: loadPlasmaSettings() }) : null,
+    opgAcquire: true,
+    opgBusy: false,
     label: o.label ?? `${o.spec.model}${sameModel ? ` #${sameModel + 1}` : ""}${o.simulated ? " (sim)" : ""}`,
     model: o.spec.model,
     spec: o.spec,
@@ -526,6 +570,15 @@ function onReading(r) {
   const d = state.devices.get(r.deviceId);
   if (!d) return;
   const t = Date.now();
+  if (d.opg) {
+    d.opg.ingestReply(r.command, { success: true, value: r.value, unit: r.unit, formatted: r.formatted, extra: r.extra }, t);
+    // A polled OPG record's "value" is its pixel count; it belongs to the studio, not a trend.
+    if (RECORD_COMMANDS.includes(r.command)) {
+      d.secondary.set(r.command, { value: r.value, formatted: r.formatted, t });
+      queueRender();
+      return;
+    }
+  }
   seriesFor(d, r.command, r.unit).push(t, r.value, statusFromWarnings(r.warnings));
   const entry = { value: r.value, unit: r.unit, formatted: r.formatted, warnings: r.warnings, extra: r.extra, t };
   d.secondary.set(r.command, entry);
@@ -543,6 +596,7 @@ function onInfo(r) {
   if (r.status) {
     if (r.command === d.primaryCommand) d.statusWord = r.status;
   } else {
+    d.opg?.ingestReply(r.command, { success: true, formatted: r.formatted, extra: r.extra ?? {} });
     d.secondary.set(r.command, { formatted: r.formatted, value: r.extra?.flags, t: Date.now() });
     if (/serial/.test(r.command)) d.identity.serial = r.formatted;
     if (/firmware|software_version/.test(r.command)) d.identity.firmware = r.formatted;
@@ -573,9 +627,11 @@ function onTerminal(t) {
   const d = state.devices.get(t.deviceId);
   if (!d) return;
   const now = Date.now();
-  pushLog(d, { t: now, kind: "tx", bytes: t.request, text: "", parsed: t.command ? `(${t.command})` : "" });
-  if (t.response?.length) pushLog(d, { t: now, kind: "rx", bytes: t.response, parsed: t.formatted ?? "", error: t.error });
-  else pushLog(d, { t: now, kind: "err", text: t.error ?? "No response" });
+  // Background reads (Spectrum Studio's record reads) are filed with poll traffic.
+  const poll = Boolean(t.autoPoll);
+  pushLog(d, { t: now, kind: "tx", bytes: t.request, text: "", parsed: t.command ? `(${t.command})` : "", poll });
+  if (t.response?.length) pushLog(d, { t: now, kind: "rx", bytes: t.response, parsed: t.formatted ?? "", error: t.error, poll });
+  else pushLog(d, { t: now, kind: "err", text: t.error ?? "No response", poll });
 }
 
 /** @param {any} g */
@@ -662,14 +718,20 @@ function changeFullScale(d) {
   });
 }
 
-/** @param {any} d @param {string} command @param {any} value  undefined for a read */
-async function sendCommand(d, command, value) {
+/**
+ * @param {any} d @param {string} command @param {any} value  undefined for a read
+ * @param {{ risk?: "caution" | "danger", notes?: string[] }} [overrides]  a caller may raise the
+ *   risk class and add notes (Spectrum Studio: plasma on above the max safe pressure)
+ */
+async function sendCommand(d, command, value, overrides = {}) {
   const info = (d.codec.commands?.() ?? []).find((/** @type {any} */ c) => c.name === command);
   const isWrite = value !== undefined;
   if (command === "baud_rate" && isWrite && value !== "") return guidedBaudChange(d, Number(value));
   const bytes = d.codec.buildRequest(command, value);
-  const risk = isWrite ? info?.risk ?? "caution" : "safe";
-  const notes = [d.spec.notes?.[command], d.spec.notes?._all].filter(Boolean);
+  const base = isWrite ? info?.risk ?? "caution" : "safe";
+  const rank = { safe: 0, caution: 1, danger: 2 };
+  const risk = overrides.risk && rank[overrides.risk] > rank[/** @type {keyof typeof rank} */ (base)] ? overrides.risk : base;
+  const notes = [...(overrides.notes ?? []), d.spec.notes?.[command], d.spec.notes?._all].filter(Boolean);
   const ok = await confirmSend({ risk, device: d.label, command, description: info?.description, value, bytes, notes, source: info?.source ?? d.spec.source });
   if (!ok) return null;
   if (isWrite) state.writes.push({ t: new Date().toISOString(), device: d.label, command, value, bytes: toHex(bytes), confirmed: risk !== "safe" });
@@ -687,11 +749,12 @@ async function sendCommand(d, command, value) {
  * A safe read with no toast, for panels that read several commands at once (identity, the
  * setpoint editor). Resolves with the terminal entry, including the parsed reply.
  * @param {any} d @param {string} command
+ * @param {{ autoPoll?: boolean }} [options]  autoPoll: a background read, filed with poll traffic
  */
-async function query(d, command) {
+async function query(d, command, options = {}) {
   const info = (d.codec.commands?.() ?? []).find((/** @type {any} */ c) => c.name === command);
   if (!info?.read) throw new Error(`${command} cannot be read.`);
-  const entry = await d.scheduler.terminal(d.id, d.codec.buildRequest(command), { command });
+  const entry = await d.scheduler.terminal(d.id, d.codec.buildRequest(command), { command, autoPoll: options.autoPoll });
   rememberReply(d, command, entry, false);
   queueRender();
   return entry;
@@ -703,6 +766,7 @@ async function query(d, command) {
  * @param {any} d @param {string} command @param {any} entry @param {boolean} isWrite
  */
 function rememberReply(d, command, entry, isWrite) {
+  if (!isWrite && command && entry.parsed) d.opg?.ingestReply(command, entry.parsed);
   if (isWrite || entry.error || !command) return;
   const parsed = entry.parsed;
   d.secondary.set(command, { value: parsed?.value, unit: parsed?.unit, formatted: entry.formatted ?? parsed?.formatted, extra: parsed?.extra, t: Date.now() });
@@ -716,14 +780,19 @@ function rememberReply(d, command, entry, isWrite) {
  * null when the user cancels.
  * @param {any} d
  * @param {{ command: string, value: any, label?: string, display?: string }[]} items
- * @param {{ title: string, description?: string, notes?: string[] }} meta
+ * @param {{ title: string, description?: string, notes?: string[], risk?: "caution" | "danger", warning?: string }} meta
+ *   risk defaults to danger; a caution batch is raised to danger when any item is a danger command
  */
 async function writeBatch(d, items, meta) {
   const built = items.map((item) => ({ ...item, bytes: d.codec.buildRequest(item.command, item.value) }));
   const notes = [...(meta.notes ?? []), ...new Set(items.map((i) => d.spec.notes?.[i.command]).filter(Boolean)), d.spec.notes?._all].filter(Boolean);
+  const infos = d.codec.commands?.() ?? [];
+  const anyDanger = items.some((i) => infos.find((/** @type {any} */ c) => c.name === i.command)?.risk === "danger");
   const ok = await confirmBatch({
     title: meta.title,
     device: d.label,
+    risk: anyDanger ? "danger" : meta.risk ?? "danger",
+    warning: meta.warning,
     description: meta.description,
     items: built.map((b) => ({ command: b.command, label: b.label, value: b.display ?? b.value, bytes: b.bytes })),
     notes,
@@ -741,6 +810,41 @@ async function writeBatch(d, items, meta) {
   state.dirty = true;
   queueRender();
   return entries;
+}
+
+/**
+ * Spectrum Studio's background acquisition (CSC `_live_spec_timer`, every 2 s): for the record
+ * behind the main plot, read the algorithm state and the record count, and the latest record
+ * when the gauge has captured one. Reads only; it never enables an algorithm (CSC re-sends the
+ * enable every 30 s, which would be an automatic write). With the plasma prompt on, it also
+ * reads the plasma state so the thresholds are evaluated against a current state.
+ */
+function opgTick() {
+  for (const d of state.devices.values()) {
+    const s = d.opg;
+    if (!s || d.opgBusy || d.opgAcquire === false) continue;
+    const session = d.scheduler?.devices.get(d.id);
+    if (!session?.polling || ["dead", "offline"].includes(d.status.state)) continue;
+    if (!s.acquisitionDue()) continue;
+    d.opgBusy = true;
+    acquireOpg(d).finally(() => {
+      d.opgBusy = false;
+      queueRender();
+    });
+  }
+}
+
+/** @param {any} d */
+async function acquireOpg(d) {
+  const s = d.opg;
+  const has = (/** @type {string} */ c) => Boolean(d.spec.commands?.[c]);
+  const read = (/** @type {string} */ c) => (has(c) ? query(d, c, { autoPoll: true }).catch(() => null) : Promise.resolve(null));
+  const record = s.activeRecordCommand();
+  if (s.plasma.autoEnabled) await read("plasma_state");
+  await read(STATE_FOR_RECORD[record]);
+  await read(COUNT_FOR_RECORD[record]);
+  const count = s.recordCounts[record];
+  if (count == null || count > 0) await read(record);
 }
 
 /** @param {any} d */
@@ -930,10 +1034,10 @@ function welcome() {
   return h("div.panel", null, h("div.welcome", null,
     h("div.welcome-hero", null,
       h("h1", null, "Talk to your vacuum gauges from the browser"),
-      h("p", null, "Add a SKY CDG, PSG55x, PCG55x or PPG550/570 over RS232 or RS485. Watch live values and trends, send commands from a guided terminal, tune setpoints visually, and export everything. There is no installer, and no data leaves this computer.")),
+      h("p", null, "Add a SKY CDG, PSG55x, PCG55x, PPG550/570 or OPG550 over RS232 or RS485. Watch live values and trends, send commands from a guided terminal, tune setpoints visually, analyse OPG550 spectra, and export everything. There is no installer, and no data leaves this computer.")),
     h("div.cards", null,
       h("div.card", null, h("span.num", null, "01"), h("h3", null, "Add a gauge"), h("p.hint", null, "Grant a USB serial adapter, scan it with read-only probes, then confirm the model and, for a CDG, the full scale."), h("button.button.primary", { type: "button", onclick: () => $("#addGaugeButton").click() }, "Add gauge")),
-      h("div.card", null, h("span.num", null, "02"), h("h3", null, "Try the demo"), h("p.hint", null, "A simulated CDG045D, PCG550 and PSG550 in a pump-down, running the real codecs and scheduler. Open the CDG's setpoint editor to see the hysteresis view."), h("button.button", { type: "button", onclick: startDemo }, "Try demo")),
+      h("div.card", null, h("span.num", null, "02"), h("h3", null, "Try the demo"), h("p.hint", null, "A simulated CDG045D, PCG550, PSG550 and OPG550 in a pump-down, running the real codecs and scheduler. Open the CDG's setpoint editor, or the OPG550's Spectrum Studio."), h("button.button", { type: "button", onclick: startDemo }, "Try demo")),
       h("div.card", null, h("span.num", null, "03"), h("h3", null, "Restore a session"), h("p.hint", null, "Sessions autosave to this browser and can be exported as JSON."), h("button.button", { type: "button", onclick: openSessions }, "Sessions")))));
 }
 
@@ -952,8 +1056,9 @@ async function startDemo() {
   await addSimulatedDevice({ model: "CDG045D", fullScale: { ...fullScaleFromMbar(13.332), origin: "user" } });
   await addSimulatedDevice({ model: "PCG550", fullScale: null });
   await addSimulatedDevice({ model: "PSG550", fullScale: null });
+  await addSimulatedDevice({ model: "OPG550", fullScale: null, poll: { commands: ["pressure"], intervalMs: 500 } });
   selectTab("combined");
-  toast("Demo running: three simulated gauges answering real frames.");
+  toast("Demo running: four simulated gauges answering real frames. Open the OPG550 and switch to Spectrum Studio.", "ok", 7000);
 }
 
 function openTurbo() {
@@ -1025,6 +1130,8 @@ function openHelp() {
       h("p", null, "Quick buttons send any read with one click; the pencil buttons load a write into the composer. Pick a command, choose Read or Write, then pick a value from the list or type your own. The exact bytes are shown before anything is sent. Star a command and value to pin it as a quick button. In the raw field, the up and down arrows recall earlier frames."),
       h("h3", null, "Setpoints"),
       h("p", null, "For gauges with setpoint relays, the Setpoints button opens an editor. You can drag the switch-on and switch-off lines, drag the shaded band to move both, use the sliders or arrows, or type a pressure. The illustrative pump-down curve shows where each relay would switch and how it holds inside the hysteresis band. Apply sends every change after one confirmation, then reads the values back."),
+      h("h3", null, "Spectrum Studio (OPG550)"),
+      h("p", null, "On an OPG550's tab, switch to Spectrum Studio. Switch the plasma on and start SPEC, RoR or RGD (both are confirmed writes); the studio then reads the latest record every 2 s and plots the spectrum, the rate of rise, tracked gases, or the difference between two pressure sources with Δ(A−B) and Δ%. The hover bar under the charts keeps the x value at the far left. The ignition thresholds are shown in the display unit but stored in mbar; when the pressure crosses one, the studio asks you before switching the plasma."),
       h("h3", null, "Keyboard"),
       h("p", null, h("code", null, "Ctrl K"), " opens the command dictionary for the current device. ", h("code", null, "Enter"), " in the terminal sends."),
       h("div.callout.warn", null, "Items marked 🟠 in the specs (for example the PxG55x CRC and Fixs32en20 decode) come from an OEM document used as a proxy, and still need a bench check against the manufacturer's protocol document.")
@@ -1175,6 +1282,11 @@ async function restore(session, samples = [], traffic = [], id) {
         const command = chunk.seriesId.slice(rec.id.length + 1);
         const s = seriesFor(d, command, chunk.unit);
         s.load(chunk);
+        // Spectrum Studio rebuilds its filtered pressure (and dP/dt) from the restored history.
+        if (d.opg && command === "pressure" && chunk.t.length) {
+          d.opg.t0 = Math.min(d.opg.t0 ?? Infinity, chunk.t[0]);
+          for (let i = 0; i < chunk.t.length; i += 1) if (Number.isFinite(chunk.v[i])) d.opg.ingestPressure(chunk.v[i], chunk.unit, chunk.t[i]);
+        }
       }
     } catch (error) {
       toast(`${rec.model}: ${/** @type {Error} */ (error).message}`, "bad", 8000);
@@ -1214,6 +1326,13 @@ function openExport() {
       option("Session JSON", "Devices, settings, layout, confirmed writes, recorded gaps — re-importable", () => download(`${fileStem()}_session.json`, JSON.stringify(sessionRecord(), null, 2), "application/json"))
     ]
   });
+}
+
+/** CSV comment header for one device, or for the whole session when `d` is null. @param {any} d */
+function exportHeader(d) {
+  const ctx = exportContext();
+  if (d) ctx.devices = ctx.devices.filter((x) => x.label === d.label);
+  return csvHeader(ctx);
 }
 
 /** @param {any} d */

@@ -24,6 +24,7 @@ import { FAMILY_LABELS } from "../core/registry/registry.js";
 import { valueShape, commandGroup, GROUP_LABELS } from "../core/command-values.js";
 import { cdgRawToMbar, gaugeRangeMbar, relayStep, zoneOf, formatSetpointValue } from "../core/setpoints.js";
 import { knownBands, readSetpoints, setpointColor } from "./setpoints.js";
+import { SpectrumStudio } from "./spectrum-studio.js";
 
 const STATE_CHIPS = {
   starting: ["Starting", "info"],
@@ -96,12 +97,14 @@ export class DeviceTab {
       title: "Trend"
     });
     const trendCard = h("div.card", null, this.trend.el);
-    replace(this.el,
-      this.header,
+    this.overview = h("div.device-overview", null,
       h("div.hero", null, this.valueCard, this.infoCard),
       trendCard,
       this.setpointCard ? h("div.split.wide-left", null, this.readingsCard, this.setpointCard) : this.readingsCard,
       this.terminalCard);
+    /** @type {SpectrumStudio | null} created on first use, for OPG550s */
+    this.studio = null;
+    this.showView();
     this.renderHeader();
     this.renderInfo();
     this.renderReadings();
@@ -112,6 +115,22 @@ export class DeviceTab {
 
   destroy() {
     this.trend.destroy();
+    this.studio?.destroy();
+  }
+
+  /** OPG550s have two views: the gauge overview and Spectrum Studio (CSC's inner tab). */
+  showView() {
+    const d = this.device;
+    if (d.opg && d.view === "studio") {
+      const first = !this.studio;
+      if (!this.studio) this.studio = new SpectrumStudio(this.app, d);
+      replace(this.el, this.header, this.studio.el);
+      this.studio.update();
+      if (first || this.lastView !== "studio") this.studio.shown();
+    } else {
+      replace(this.el, this.header, this.overview);
+    }
+    this.lastView = d.opg ? d.view ?? "overview" : "overview";
   }
 
   trendSeries() {
@@ -125,6 +144,17 @@ export class DeviceTab {
     const d = this.device;
     const pause = h("button.button.small", { type: "button", onclick: () => this.app.setPolling(d, d.status.state === "paused" || d.status.state === "dead" || d.status.state === "offline") }, "Pause");
     this.pauseButton = pause;
+    let views = null;
+    if (d.opg) {
+      views = h("div.segmented.view-switch", { role: "group", "aria-label": "View" });
+      for (const [id, label] of [["overview", "Gauge"], ["studio", "Spectrum Studio"]]) {
+        views.append(h("button", { type: "button", "aria-pressed": String((d.view ?? "overview") === id), onclick: () => {
+          d.view = id;
+          for (const b of /** @type {HTMLElement} */ (views).querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.textContent === label));
+          this.showView();
+        } }, label));
+      }
+    }
     replace(this.header,
       h("span.swatch", { style: { background: d.color } }),
       h("h2", null, d.label),
@@ -132,6 +162,7 @@ export class DeviceTab {
       d.simulated ? h("span.chip.info", null, "simulated") : null,
       d.experimental ? h("span.chip.warn", null, "experimental") : null,
       h("span.line-info", null, `${d.portLabel} · ${d.line.rsMode}${d.line.rsMode === "RS485" ? ` address ${d.address}` : ""} · ${d.line.baudRate} baud`),
+      views,
       h("div.grow"),
       pause,
       this.layout ? h("button.button.small.primary", { type: "button", onclick: () => this.app.openSetpoints(d) }, "Setpoints…") : null,
@@ -149,6 +180,7 @@ export class DeviceTab {
     const d = this.device;
     const paused = ["paused", "dead", "offline"].includes(d.status.state);
     if (this.pauseButton) this.pauseButton.textContent = paused ? "Resume" : "Pause";
+    if (this.studio && d.view === "studio") return this.studio.update();
     this.updateReadings();
     this.updateSetpointSummary();
     this.updateInfo();

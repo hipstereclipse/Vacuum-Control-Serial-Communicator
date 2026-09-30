@@ -133,7 +133,7 @@
         "0": "Plasma interlock OFF",
         "1": "Plasma interlock ON"
       },
-      "risk": "caution",
+      "risk": "danger",
       "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "plasma_enable": {
@@ -461,5 +461,8 @@
   "source": "CSC P3 V02 codec and device_specs (🟠 V13)",
   "default_unit": "mbar",
   "probe": "p3v02",
-  "notes": {}
+  "notes": {
+    "plasma_enable": "Ignite the plasma only below the max safe pressure set in Spectrum Studio (CSC default 1E-2 mbar). 🟠 Check the ignition limits in the OPG550 operating manual (V20).",
+    "plasma_interlock_enable": "The plasma interlock stops the plasma where it could harm the sensor. Switching it off removes that protection."
+  }
 }

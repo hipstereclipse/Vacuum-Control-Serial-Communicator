@@ -20,7 +20,7 @@
 import { createSimulationEngine } from "./engine.js";
 import { createRng, normalizeGas, normalizeHumidity, normalizePattern, simulatedGaugeConfig } from "./models.js";
 import { listScenarios, scenarioByKey } from "./scenarios.js";
-import { OPG_ANALYSIS_MAX_PRESSURE_MBAR, identifyOpticalSpecies, normalizeSpectrumMode, simulateOpticalSpectrum } from "./opg-spectrum.js";
+import { OPG_ANALYSIS_MAX_PRESSURE_MBAR, identifyOpticalSpecies, normalizeSpectrumMode, opticalComposition, simulateOpticalSpectrum } from "./opg-spectrum.js";
 import { createSimulatedGauge } from "./simulated-gauge.js";
 
 export { listScenarios } from "./scenarios.js";
@@ -207,7 +207,8 @@ export function createSimulation(options = {}) {
     const wavelengthsNm = intensities.map((_, i) => wavelengthMinNm + (wavelengthMaxNm - wavelengthMinNm) * (i / (n - 1)));
     const analysable = pressureMbar <= OPG_ANALYSIS_MAX_PRESSURE_MBAR;
     const species = analysable ? identifyOpticalSpecies(intensities, { wavelengthMinNm, wavelengthMaxNm, topK: opts.topK ?? 10 }) : [];
-    return { mode, pressureMbar, wavelengthsNm, intensities, analysable, species };
+    const composition = opticalComposition(pressureMbar, trend, engine.elapsed(), mode);
+    return { mode, pressureMbar, trendMbarPerS: trend, elapsedS: engine.elapsed(), wavelengthsNm, intensities, analysable, species, composition };
   }
 
   setInputs({ scenario: "pumpdown_realistic", ...options });

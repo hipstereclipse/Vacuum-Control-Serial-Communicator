@@ -24,8 +24,9 @@ Every factual statement is traced to one of the sources in the table below, cite
 | S14 | inficon.com PSG55x and PCG55x product pages, download sections | Existence of the shared "PxG55x Communication Protocol RS232C/RS485C" document |
 | S15 | PCG55x brochure (copy hosted by idealvac.com) | PCG55x digital interface and RS485 connector variant |
 | S16 | Agilent TQRA78E1, "RS232C Serial Interface for Pirani Diaphragm and Pirani Standard Gauges" (PCG-750/752, PVG-550/552) | 🟠 OEM protocol detail, used as a proxy until the INFICON PxG55x document is checked |
+| S17 | CSC `GUI/gauge_workspace/gauge_tab.py` class `OPG550SpectrumStudio`, `tests/test_opg_spectrum_studio.py`, and the `opg/...` defaults in `GUI/settings_dialog.py` | Spectrum Studio behavior, constants and CSV layouts (section 8) |
 
-**What was not reviewed.** GitHub blocks automated fetching of repository directory listings, so the YAML files under `device_specs/` could not be located and read, and the per-model command tables in them are not reflected here. Separately, `session.py`, `export_dialog.py`, `transport.py`, `models.py`, `inficon_p3_v02.py`, the simulation modules, `turbos/`, the CSC tests, and every GUI file other than `port_scanner.py` were not reviewed for this draft. Anything in this plan that depends on those files is marked 🟠 and listed in section 16.
+**What was not reviewed.** GitHub blocks automated fetching of repository directory listings, so the YAML files under `device_specs/` could not be located and read, and the per-model command tables in them are not reflected here. Separately, `session.py`, `export_dialog.py`, `transport.py`, `models.py`, `inficon_p3_v02.py`, the simulation modules, `turbos/`, the CSC tests, and every GUI file other than `port_scanner.py` were not reviewed for this draft. (Later, for Spectrum Studio, the `OPG550SpectrumStudio` class in `gauge_tab.py`, its tests and the OPG settings defaults were reviewed: S17.) Anything in this plan that depends on those files is marked 🟠 and listed in section 16.
 
 ## 1. Goal and scope
 
@@ -59,7 +60,7 @@ This is the checklist that defines "keeps the core functionality." A phase numbe
 | 14 | Export captured readings | `export_dialog.py` | Measurement CSV, traffic CSV, transcript, session JSON (minimal CSV already in phase 1) | 1, 3 |
 | 15 | Simulation with leak, humidity, gas type, base pressure and recipes; OPG optical spectra | `simulation_*.py`, `opg_spectrum.py` | JS simulation engine plus protocol emulators behind a fake port | 4 |
 | 16 | TC600 turbo workspace | `GUI/turbo_workspace`, `src/serial_comm/turbos` | Turbo workspace | 5 |
-| 17 | OPG550 Spectrum Studio: fixed-position hover bar, Δ(A-B) and Δ% between sources, full peer-pressure history, plasma ignition thresholds shown in the active unit but stored and evaluated in mbar | README, Spectrum Studio section | Spectrum Studio | 6 |
+| 17 | OPG550 Spectrum Studio: fixed-position hover bar, Δ(A-B) and Δ% between sources, full peer-pressure history, plasma ignition thresholds shown in the active unit but stored and evaluated in mbar | README, Spectrum Studio section; `gauge_tab.py` (S17) | Spectrum Studio view on the OPG550's device tab (section 8), model in `core/opg/` | 6 (built) |
 
 The VGC tool adds several things CSC does not have, and the plan adopts them because they already work in the browser and David's users will meet both tools: a display-only units control, a searchable command dictionary with safe/caution/danger risk labels, a guided command builder with a live byte preview, multi-format input (ASCII, escaped text, hex, decimal, Base64), IndexedDB autosave, light and dark themes, a no-hardware demo, and the double-click launchers (S10).
 
@@ -247,6 +248,8 @@ Ported one-to-one from S5. The frame is a 3-digit address, 2-character action (`
 
 The scanner reopens at 115200 baud and reads PIDs 10001 (product name), 10000 (manufacturer), 10002 (serial number) and 10004 (software version); frames are a 5-byte header with a 16-bit APDU length, the APDU, and a 2-byte CRC (S7, S9). 🟠 The CRC and APDU details live in `inficon_p3_v02.py`, which was not reviewed (V13).
 
+Beyond pressure, the OPG550 spec carries the plasma PIDs (12000 to 12003), the operating mode (19000), "all algorithms off" (19100), the three analysis algorithms SPEC, RoR and RGD (20000, 21000 and 22000 upwards: enable, state, buffer size, record count, record), and the analog output (30000, 30001). The codec decodes the three record types as CSC does: a 17-byte header (record ID, time, integration time, total pressure, ignition flag), then 288 pixels, plus the pressure rise and six leak-rate numbers for RoR, or ten gas intensities, ten partial pressures and eight ratios for RGD. Spectrum Studio (section 8) is built on these records. 🟠 The record request data (record index and array descriptors) is sent exactly as CSC's spec has it and is not yet understood (V13, V20).
+
 ### 5.7 Other families
 
 HPG400 appears in the CDG sensor-code map as `0x0B` (S3, S7), so it shares the 9-byte frame, but 🟠 its pressure conversion is not covered by the CDG ratio formula and must come from the HPG400 manual (V12). 🟠 The S4 docstring assigns the binary protocol with `LogFixs32en26` to MAG, MPG, BPG and BCG; given that the `Fixs32en20` decode turned out to be wrong, that claim needs its own verification (V11). All of these ship as experimental, following CSC's staged rollout (S2 section 9).
@@ -318,6 +321,29 @@ The layout follows CSC's main workspace (device list panel, add gauge, simulate 
 
 **Combined tab.** Overlay, stacked and grid layouts, visibility toggles, per-device colors, synchronized navigation, and full session history per series so gauges at different poll rates still share a comparable time axis (S1). The shared hover bar keeps the cursor X value fixed at the far left, the convention CSC uses in Spectrum Studio (S1).
 
+**Spectrum Studio (OPG550).** CSC gives the OPG550 an extra inner tab, Spectrum Studio (S17). In the browser, the OPG550's device tab has a Gauge / Spectrum Studio switch. The studio's state lives on the device (`core/opg/spectrum-studio.js`), not in the view, so its histories keep growing while another tab is shown, as in CSC. What it ports:
+
+- Four main plots, each showing only its own charts, as CSC does. **Raw Spectrum** shows the spectrum over 303.05 to 876.07 nm with dotted signature lines for tracked gases. **Rate of Rise** shows dP/dt, or the rate of each tracked gas, with the pressure dashed on a right axis. **Residual Gas Detection** shows the spectrum, or the tracked-gas partial pressures once a gas is ticked. **Advanced Analysis** shows two chosen pressure sources, the band between them, and the partial pressure of a chosen gas on a linear right axis.
+- One hover bar under the charts, with the x value always first at the far left: seconds since the gauge was added and the clock time, or the wavelength. It also shows the values at the cursor, including Δ(A−B) and Δ% (B is the reference). A line under the correlation chart gives Δ, Δ% and the ratio of the latest values.
+- Full history everywhere. The comparison sources are every pressure series of every device in the session, read directly from their sample buffers, so gauges polled at different rates share one time axis.
+- The OPG550's own pressure, with CSC's spike rejection: a reading more than 100 times the median of the last five is dropped. Optical species identification runs at or below 1E-2 mbar. The gas history (share, partial pressure, rate) and the "Live Data" or simulated scenario plot options are ported too.
+- Background acquisition every 2 s for Live Data: the algorithm state, the record count, and the latest record when one exists. These are reads only, and the terminal files them with poll traffic.
+- One-shot "Poll mode" and "Snapshot all" reads, telemetry, the vacuum regime bar, and device details.
+- Exports: CSC's OPG CSV (the RGD or RoR layout, with Python number formatting so files diff cleanly against CSC's), plus one CSV per chart.
+
+Deliberate differences from CSC:
+
+| CSC | Browser | Why |
+|---|---|---|
+| "Auto plasma" switches the plasma on below the minimum ignition pressure and off above the maximum safe pressure | The same thresholds, stored and evaluated in mbar, with the same 5 s cooldown, raise a prompt; the write needs a click and a confirmation | Section 11: no automatic writes |
+| Changing the main plot writes `all_algorithms_off` and the enable command, and the enable is re-sent every 30 s | "Start SPEC / RoR / RGD" sends both writes behind one caution confirmation; the studio warns when a started algorithm is not running | Same |
+| Plasma on is an unconfirmed button | Caution. It becomes danger, with a note, when the OPG550 reads above the maximum safe pressure | Section 11 |
+| The next pressure reading replaces the RGD record's own partial pressures with the optical fit | The RGD shares hold until the next spectrum | The gauge's partials are the better data |
+| The OPG CSV writes placeholder firmware versions when none was read, and AnalogOut 0 and IntegrationTime 0 always | The version fields stay empty; AnalogOut and IntegrationTime carry the last analog-output reading and the record's integration time | No invented data in exports |
+| Temperature card and thermal-load bar | Left out | The OPG550 spec has no temperature command, so CSC's card never shows a value |
+
+The simulator's OPG550 emulator answers the same records. Its plasma ignites below 1E-2 mbar, records arrive once a second, and the RGD partials follow the simulation's gas and leak scenario. The demo therefore includes an OPG550. 🟠 The emulator's ignition limit, record cadence, integration time and analog-output scaling are illustrative (V20).
+
 **Trend engine.** The VGC tool's trend already does most of what is needed: log decade gridlines or linear ticks, 1 min to whole-session windows, freeze, hover crosshair, per-channel last, min, max, mean and a least-squares rate in decades per minute, per-pixel-column decimation that keeps extremes, and broken lines on non-OK status and on silences far longer than the channel's cadence (S10). The plan generalizes it from channels of one controller to series from many devices and adds the three combined layouts, rather than introducing a charting library. 🟠 If canvas performance falls short with many long series, uPlot is the fallback to evaluate, bundled locally rather than loaded from a CDN so the tool keeps working offline.
 
 **Terminal.** ASCII, ASCII + HEX and HEX views, follow and clear (S10), and the VGC input formats and line endings (S10). Binary protocols need more than raw hex entry, so the composer gains a frame builder: pick a command or PID and a value, and it assembles the frame with the correct checksum or CRC and shows the bytes before sending. Raw hex is still allowed, but a frame whose checksum or CRC does not validate is flagged before it goes out.
@@ -372,7 +398,7 @@ The tool can send commands that change gauge configuration and switch relays, so
 
 Scan, identification, unit reads, gauge detection and polling send only read requests (S11). Every command in every spec carries a risk class. Safe commands send immediately. Caution commands show a confirmation with the exact bytes. Danger commands show the bytes, a plain-language statement of what will happen, the relevant preconditions and the source document, and need a second deliberate click (the VGC tool flags danger commands "clearly before you send", S10; the second click is this plan's proposal). Following CSC's guide, safety-critical turbo commands are write-protected unless that explicit confirmation is present (S2 section 5).
 
-Baud-rate writes (PxG55x PID 227) get a guided workflow: warn, write, close, reopen at the new rate, verify identity, and, if verification fails, reopen at the old rate and report which state the gauge is most likely in. Zero and full-scale adjustments show the connected model's preconditions: for the CDG045D, zeroing is locked at atmosphere and during warm-up (S13); for other CDG models, the dialog names that model's own manual, because those thresholds are model-specific (S13 scope warning). Setpoint writes are danger because the relays they move may be wired into valve or pump interlocks. OPG550 plasma ignition thresholds keep CSC's behavior of display in the active unit with storage and evaluation in mbar (S1). 🟠 The PxG55x device dialog repeats S16's caution against using the serial interface and a fieldbus or the diagnostic port at the same time (V1).
+Baud-rate writes (PxG55x PID 227) get a guided workflow: warn, write, close, reopen at the new rate, verify identity, and, if verification fails, reopen at the old rate and report which state the gauge is most likely in. Zero and full-scale adjustments show the connected model's preconditions: for the CDG045D, zeroing is locked at atmosphere and during warm-up (S13); for other CDG models, the dialog names that model's own manual, because those thresholds are model-specific (S13 scope warning). Setpoint writes are danger because the relays they move may be wired into valve or pump interlocks. OPG550 plasma ignition thresholds keep CSC's behavior of display in the active unit with storage and evaluation in mbar (S1). Where CSC then switches the plasma by itself, the browser raises a prompt and leaves the write to the user; starting an OPG550 analysis algorithm is likewise an explicit, confirmed action (section 8). 🟠 The PxG55x device dialog repeats S16's caution against using the serial interface and a fieldbus or the diagnostic port at the same time (V1).
 
 Version 1 performs no automatic writes of any kind. The VGC tool's gauge interlock is controller-specific and is not ported; standalone gauges have their own setpoint relays for permanent protection.
 
@@ -413,6 +439,7 @@ Gauge-Serial-Communication-Tool/
 │  │  ├─ units.js
 │  │  ├─ models.js                     # Reading, DeviceReading, DeviceError, TerminalEntry
 │  │  ├─ turbo/                        # TC600 (phase 5)
+│  │  ├─ opg/                          # Spectrum Studio model and exports (phase 6)
 │  │  └─ sim/                          # engine, scenarios, emulators (phase 4)
 │  ├─ specs/                           # generated JSON; never edited by hand
 │  ├─ app.js                           # UI wiring
@@ -494,6 +521,8 @@ Each build shows its version and short commit hash in the footer, and writes bot
 
 Phases 1 and 2 are where the INFICON gauge requirement is met; phases 3 to 6 close the remaining gaps in the parity matrix.
 
+**Status, 2026-09-30.** Phases 0 to 5 are built and the P3 V02 codec is in place. Spectrum Studio, the rest of phase 6, was built next, out of order. It is covered by Node tests (`tests/opg/`, including ports of CSC's `test_opg_spectrum_studio.py`) and by the browser smoke test on the demo. Phase 6's exit criterion, a bench session with an OPG550, is still open; so are V13 and V20.
+
 ## 16. Verification register
 
 | ID | Item | Why it matters | Where to verify |
@@ -517,6 +546,7 @@ Phases 1 and 2 are where the INFICON gauge requirement is met; phases 3 to 6 clo
 | V17 | Field sets of `session.py` and `export_dialog.py`; behavior of the simulation modules | Session, export and simulation parity | CSC source |
 | V18 | The VGC tool's Pages workflow steps and whether it registers a service worker | CI and offline use | VGC `.github/workflows/`, `public/` |
 | V19 | Whether `cdg_proto.pdf` is TIRA49E1 | Citation hygiene | Open the file |
+| V20 | OPG550 plasma ignition limits; the meaning of the SPEC, RoR and RGD record request data; the record cadence, integration time and analog-output scaling the emulator assumes | Plasma safety note, record reads, credibility of the simulated studio | OPG550 operating and communication manuals (CSC keeps `scripts/opg_proto.pdf`), then a bench session |
 
 ## Appendix A: Golden test vectors
 
@@ -577,6 +607,7 @@ export function crc16x8408(bytes) {
 | `GUI/gauge_workspace/port_scanner.py` | `core/scan/probe-plans.js`, `core/scan/scanner.js` | Plus the PxG probe |
 | `GUI/main_window.py`, `gauge_tab.py`, `combined_tab.py`, `terminal_widget.py`, `add_gauge_dialog.py`, `add_simulated_gauge_dialog.py`, `simulation_tab.py`, `export_dialog.py` | `app/page.js` and `public/app.js` UI modules | |
 | `GUI/turbo_workspace/` | Turbo workspace UI | Phase 5 |
+| `GUI/gauge_workspace/gauge_tab.py` `OPG550SpectrumStudio` | `core/opg/spectrum-studio.js`, `core/opg/export.js`, `ui/spectrum-studio.js`, `ui/xy-chart.js` | Phase 6; differences in section 8 |
 
 ## Appendix C: Constants carried over from CSC
 

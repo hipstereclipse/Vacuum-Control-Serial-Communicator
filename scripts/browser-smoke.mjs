@@ -89,11 +89,11 @@ try {
   await cdp.send("Page.navigate", { url: `${pageUrl}${pageUrl.includes("?") ? "&" : "?"}demo=1` });
 
   let devices = 0;
-  for (let i = 0; i < 80 && devices < 3; i += 1) {
+  for (let i = 0; i < 80 && devices < 4; i += 1) {
     await pause(250);
     devices = await evaluate(cdp, `document.querySelectorAll("#deviceList .device-item").length`).catch(() => 0);
   }
-  if (devices < 3) {
+  if (devices < 4) {
     const diag = await evaluate(cdp, `({ html: document.querySelector("#panels")?.innerText?.slice(0, 300), scripts: [...document.scripts].map(s => (s.type || "classic") + " " + (s.src || "inline")) })`);
     throw new Error(`Demo did not start: ${JSON.stringify(diag)}`);
   }
@@ -124,6 +124,22 @@ try {
     await pauseIn(700);
     const canvas = document.querySelector(".trend-canvas");
     const stats = document.querySelector(".trend-stats")?.innerText ?? "";
+    // Spectrum Studio on the OPG550: the view switch, a drawn chart, the hover bar, and the
+    // comparison sources in Advanced Analysis (no writes: plasma and algorithms stay off).
+    items[3].click();
+    await pauseIn(300);
+    [...document.querySelectorAll(".view-switch button")].find((b) => b.textContent === "Spectrum Studio")?.click();
+    await pauseIn(600);
+    const studio = document.querySelector(".studio");
+    const main = studio?.querySelector('select[aria-label="Main plot"]');
+    if (main) {
+      main.value = "Advanced Analysis";
+      main.dispatchEvent(new Event("change"));
+    }
+    await pauseIn(700);
+    const studioCanvas = [...(studio?.querySelectorAll(".xy-canvas") ?? [])].find((c) => c.offsetParent && c.width > 0);
+    const compareOptions = studio?.querySelector('select[aria-label="Compare B"]')?.options.length ?? 0;
+    const studioResult = { present: Boolean(studio), canvas: Boolean(studioCanvas), hoverBar: Boolean(studio?.querySelector(".studio-hoverbar .hb-x")), compareOptions, delta: studio?.querySelector(".studio-delta")?.textContent ?? "" };
     // Export: capture the CSV instead of downloading it.
     let captured = "";
     const original = URL.createObjectURL;
@@ -141,12 +157,14 @@ try {
     await pauseIn(400);
     const torr = document.querySelector(".value-main")?.textContent;
     const reported = document.querySelector(".value-sub")?.textContent;
-    return { values, preview, terminal: terminal.slice(-400), canvas: Boolean(canvas && canvas.width > 0), stats: stats.slice(0, 200), csvLines: captured.split("\\n").length, csvHead: captured.split("\\n").slice(0, 4).join(" | "), torr, reported, build: document.querySelector("#buildInfo").textContent };
+    return { studio: studioResult, values, preview, terminal: terminal.slice(-400), canvas: Boolean(canvas && canvas.width > 0), stats: stats.slice(0, 200), csvLines: captured.split("\\n").length, csvHead: captured.split("\\n").slice(0, 4).join(" | "), torr, reported, build: document.querySelector("#buildInfo").textContent };
   })()`);
 
   const errors = cdp.events.filter((e) => e.method === "Runtime.exceptionThrown" || (e.method === "Log.entryAdded" && e.params.entry.level === "error" && !/favicon|manifest|DevTools/.test(e.params.entry.text)));
   const checks = {
-    threeDevices: result.values.length === 3,
+    fourDevices: result.values.length === 4,
+    studioDrawn: result.studio.present && result.studio.canvas && result.studio.hoverBar,
+    studioSources: result.studio.compareOptions >= 4 && /Δ = /.test(result.studio.delta),
     everyGaugeHasAValue: result.values.every((v) => v.value && !v.value.startsWith("—")),
     cdgStreaming: result.values[0].chips.includes("Streaming"),
     pxgPolling: result.values[1].chips.includes("Polling"),

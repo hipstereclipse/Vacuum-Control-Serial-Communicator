@@ -20,7 +20,8 @@
     "test:sim": "node scripts/test-sim.mjs",
     "test:store": "node scripts/test-store.mjs",
     "test:setpoints": "node scripts/test-setpoints.mjs",
-    "test": "node scripts/specs-build.mjs --check && node scripts/validate-source.mjs && node scripts/test-framers.mjs && node scripts/test-codecs.mjs && node scripts/test-scan.mjs && node scripts/test-scheduler.mjs && node scripts/test-sim.mjs && node scripts/test-store.mjs && node scripts/test-setpoints.mjs",
+    "test:opg": "node scripts/test-opg.mjs",
+    "test": "node scripts/specs-build.mjs --check && node scripts/validate-source.mjs && node scripts/test-framers.mjs && node scripts/test-codecs.mjs && node scripts/test-scan.mjs && node scripts/test-scheduler.mjs && node scripts/test-sim.mjs && node scripts/test-store.mjs && node scripts/test-setpoints.mjs && node scripts/test-opg.mjs",
     "test:browser": "node scripts/browser-smoke.mjs"
   },
   "dependencies": {

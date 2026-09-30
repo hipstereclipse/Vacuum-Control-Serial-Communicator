@@ -173,12 +173,13 @@ export class PortScheduler extends Emitter {
    * Queue a terminal frame (raw bytes or a built command). Resolves with the TerminalEntry.
    * @param {string} deviceId
    * @param {Uint8Array} request
-   * @param {{ command?: string, isWrite?: boolean }} [options]
+   * @param {{ command?: string, isWrite?: boolean, autoPoll?: boolean }} [options]  autoPoll marks a
+   *   background read (Spectrum Studio's record reads), which the terminal files with poll traffic
    * @returns {Promise<import("../models.js").TerminalEntry>}
    */
   terminal(deviceId, request, options = {}) {
     return new Promise((resolve, reject) => {
-      this.jobs.push({ kind: "terminal", deviceId, request, command: options.command ?? "", isWrite: Boolean(options.isWrite), resolve, reject });
+      this.jobs.push({ kind: "terminal", deviceId, request, command: options.command ?? "", isWrite: Boolean(options.isWrite), autoPoll: Boolean(options.autoPoll), resolve, reject });
       this._wake();
     });
   }
@@ -364,7 +365,7 @@ export class PortScheduler extends Emitter {
       try {
         const { frame } = await this._transact(device, job.request, job.command);
         /** @type {import("../models.js").TerminalEntry} */
-        const entry = { request: job.request, response: frame ?? new Uint8Array(0), wall, command: job.command };
+        const entry = { request: job.request, response: frame ?? new Uint8Array(0), wall, command: job.command, autoPoll: job.autoPoll };
         if (!frame) entry.error = "No response";
         else if (job.command) {
           const parsed = device.codec.parseResponse(frame, job.command);
@@ -376,7 +377,7 @@ export class PortScheduler extends Emitter {
         this.emit("terminal", { deviceId: device.id, ...entry });
         job.resolve(entry);
       } catch (error) {
-        const entry = { request: job.request, response: new Uint8Array(0), wall, command: job.command, error: String(/** @type {Error} */ (error).message ?? error) };
+        const entry = { request: job.request, response: new Uint8Array(0), wall, command: job.command, autoPoll: job.autoPoll, error: String(/** @type {Error} */ (error).message ?? error) };
         this.emit("terminal", { deviceId: device.id, ...entry });
         job.resolve(entry);
       }
@@ -455,6 +456,8 @@ export class PortScheduler extends Emitter {
       }
       try {
         const { frame, sawResponse } = await this._transact(device, request, command);
+        // stop() cuts the pending transaction short; that is not a gauge error.
+        if (!this.running && !frame) return;
         if (sawResponse) cycleSawResponse = true;
         const result = device.codec.parseResponse(frame ?? new Uint8Array(0), command);
         this._afterCommand(device, command, result);
