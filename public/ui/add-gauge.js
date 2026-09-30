@@ -150,19 +150,69 @@ export function openAddGauge(app) {
       replace(resultsBox, h("p.empty", null, "Nothing found yet. Scan, or add a gauge manually."));
       return;
     }
-    const rows = results.map((r) => {
+
+    let lastClickIndex = -1;
+
+    const rowMap = new Map();
+    const rows = results.map((r, idx) => {
       const box = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: r.selected }));
-      box.onchange = () => {
-        r.selected = box.checked;
-      };
-      return h("tr", null,
+      const row = h("tr", null,
         h("td", null, box),
         h("td", null, r.portLabel),
         h("td", null, h("strong", null, r.modelHint), r.model ? null : h("div.hint", null, "no matching model — choose one below")),
         h("td", null, `${r.baudRate} baud`, r.rsMode === "RS485" ? ` · addr ${r.address}` : ""),
         h("td.hint", null, r.description),
         h("td", null, r.family === "cdg_serial" ? (r.fullScaleConfident ? h("span.chip.ok", null, `FS≈${r.fullScaleMbar} mbar`) : h("span.chip.warn", null, "FS unknown")) : ""));
+
+      rowMap.set(idx, { row, box });
+      row.classList.toggle("selected", r.selected);
+
+      row.onmousedown = (e) => {
+        if (e.button !== 0) return;
+
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+click: toggle individual item
+          r.selected = !r.selected;
+          lastClickIndex = idx;
+        } else if (e.shiftKey && lastClickIndex >= 0) {
+          // Shift+click: select range
+          const [start, end] = lastClickIndex < idx ? [lastClickIndex, idx] : [idx, lastClickIndex];
+          for (let i = start; i <= end; i++) results[i].selected = true;
+          lastClickIndex = idx;
+        } else {
+          // Regular click: select only this item (unless dragging)
+          results.forEach((x, i) => x.selected = i === idx);
+          lastClickIndex = idx;
+        }
+
+        updateAllRows();
+      };
+
+      row.onmouseover = (e) => {
+        // Click and drag: select range from last click to current
+        if (e.buttons === 1 && lastClickIndex >= 0 && lastClickIndex !== idx) {
+          const [start, end] = lastClickIndex < idx ? [lastClickIndex, idx] : [idx, lastClickIndex];
+          results.forEach((x, i) => x.selected = i >= start && i <= end);
+          updateAllRows();
+        }
+      };
+
+      box.onchange = () => {
+        r.selected = box.checked;
+        row.classList.toggle("selected", r.selected);
+      };
+
+      return row;
     });
+
+    const updateAllRows = () => {
+      rowMap.forEach(({ row, box }, idx) => {
+        const isSelected = results[idx].selected;
+        row.classList.toggle("selected", isSelected);
+        box.checked = isSelected;
+      });
+    };
+
     replace(resultsBox,
       h("div.scroll", null, h("table.data", null, h("thead", null, h("tr", null, h("th", null, ""), h("th", null, "Port"), h("th", null, "Found"), h("th", null, "Line"), h("th", null, "Details"), h("th", null, ""))), h("tbody", null, rows))),
       h("div.row", { style: { marginTop: "8px" } }, h("button.button", { type: "button", onclick: () => {

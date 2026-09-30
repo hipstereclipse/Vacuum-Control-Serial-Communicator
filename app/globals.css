@@ -397,6 +397,8 @@ table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.data th { text-align: left; color: var(--muted); font-weight: 700; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; padding: 7px 8px; border-bottom: 2px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 1; }
 table.data td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 table.data tr:hover td { background: var(--surface-2); }
+table.data tr.selected td { background: var(--action-soft); }
+table.data tr.selected:hover td { background: var(--action-soft); }
 .scroll { max-height: 340px; overflow: auto; }
 
 /* Dialogs */
