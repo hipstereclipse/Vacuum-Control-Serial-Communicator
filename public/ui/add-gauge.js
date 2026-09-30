@@ -141,7 +141,7 @@ export function openAddGauge(app) {
       h("div.row", null, mode, scanButton, cancel),
       h("details", null, h("summary", null, "RS485 address sweep (slow; only on ports marked RS485)"),
         h("div.row", { style: { marginTop: "8px" } }, family, baud, "from", from, "to", to, sweep),
-        h("p.hint", null, "One read per address with a short timeout. Broadcast addresses are never used on a multi-drop bus. 🟠 The PxG55x RS485 address range and factory address still need checking in the INFICON protocol document (V2).")),
+        h("p.hint", null, "One read per address with a short timeout. Broadcast addresses are never used on a multi-drop bus. 🟠 The PxG55x RS485 address range and factory address still need checking in the manufacturer's protocol document (V2).")),
       statusLog);
   }
 
@@ -346,7 +346,7 @@ function configEditor(app, c, onRemove, onChange) {
         onChange();
       }) : null,
       spec && spec.protocol !== "cdg_serial" ? h("div.field", null, h("span.field-label", null, "Poll commands (reads only)"), h("div.poll-commands", null, commandBoxes)) : null,
-      h("div.hint", { style: { color: "var(--amber)" } }, problems(app, c).join(" ")));
+      h("div.hint.problem", null, problems(app, c).join(" ")));
   };
   render();
   return box;

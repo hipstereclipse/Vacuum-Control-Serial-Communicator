@@ -46,7 +46,7 @@ export function createP3V02Emulator(options = {}) {
 
   /** @type {Record<number, { read?: (req: Uint8Array) => Uint8Array, write?: (data: Uint8Array) => number | void }>} */
   const params = {
-    10000: { read: () => cstr(options.manufacturer ?? "INFICON") },
+    10000: { read: () => cstr(options.manufacturer ?? "SIMULATED") },
     10001: { read: () => cstr(product) },
     10002: { read: () => cstr(options.serial ?? "55001234") },
     10003: { read: () => cstr(options.bootloader ?? "1.00") },

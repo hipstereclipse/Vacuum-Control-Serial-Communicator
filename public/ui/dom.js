@@ -96,5 +96,8 @@ export function formatClock(ms) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}.${String(d.getMilliseconds()).padStart(3, "0")}`;
 }
 
-/** Stable color palette for series (readable in both themes). */
-export const SERIES_COLORS = ["#24d3bd", "#69aefb", "#f1b557", "#b98cf6", "#ef6c70", "#7fd46b", "#f08fc0", "#5fd0e8"];
+/**
+ * Series colours from the brand chart palette (secondary blues, then greys), ordered so the
+ * first few stay distinct and readable on both the light and the dark theme.
+ */
+export const SERIES_COLORS = ["#1b74b3", "#7e848f", "#82b4d9", "#0f5e9e", "#a9aeb6", "#4993cb", "#124477", "#58646f"];

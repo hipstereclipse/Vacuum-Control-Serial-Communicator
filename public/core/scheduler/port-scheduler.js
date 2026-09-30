@@ -369,6 +369,7 @@ export class PortScheduler extends Emitter {
         else if (job.command) {
           const parsed = device.codec.parseResponse(frame, job.command);
           entry.formatted = parsed.success ? parsed.formatted ?? String(parsed.value) : undefined;
+          entry.parsed = parsed;
           if (!parsed.success) entry.error = parsed.error;
           this._afterCommand(device, job.command, parsed);
         }

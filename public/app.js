@@ -9,7 +9,9 @@ import { DeviceTab } from "./ui/device-tab.js";
 import { CombinedTab } from "./ui/combined.js";
 import { SimulationTab, openSimulate, SIMULATABLE } from "./ui/simulate.js";
 import { openAddGauge, defaultCommands, fullScalePicker, fullScaleFromMbar } from "./ui/add-gauge.js";
-import { confirmSend } from "./ui/confirm.js";
+import { confirmSend, confirmBatch } from "./ui/confirm.js";
+import { openSetpointEditor } from "./ui/setpoints.js";
+import { detectSetpoints } from "./core/setpoints.js";
 import { Registry } from "./core/registry/registry.js";
 import { PortSession, describePort } from "./core/transport/port-session.js";
 import { EmulatedPort } from "./core/transport/emulated-port.js";
@@ -101,6 +103,10 @@ const app = {
   setIntervalMs,
   sendCommand,
   sendRaw,
+  query,
+  writeBatch,
+  openSetpoints,
+  setpointLayout,
   openDictionary,
   exportDevice,
   changeFullScale,
@@ -462,6 +468,8 @@ function createDevice(o) {
     status: { state: "starting", message: "" },
     /** @type {any[]} */
     log: [],
+    /** @type {any[]} terminal composer history, newest first */
+    history: [],
     cycleMs: 0,
     showPollTraffic: false
   };
@@ -669,11 +677,82 @@ async function sendCommand(d, command, value) {
   if (isWrite) state.writes[state.writes.length - 1].response = entry.error ?? entry.formatted ?? toHex(entry.response);
   if (entry.error) toast(`${command}: ${entry.error}`, "warn");
   else if (entry.formatted) toast(`${command}: ${entry.formatted}`);
-  if (/serial/.test(command) && entry.formatted) d.identity.serial = entry.formatted;
-  if (/firmware|software_version/.test(command) && entry.formatted) d.identity.firmware = entry.formatted;
+  rememberReply(d, command, entry, isWrite);
   state.dirty = true;
   queueRender();
   return entry;
+}
+
+/**
+ * A safe read with no toast, for panels that read several commands at once (identity, the
+ * setpoint editor). Resolves with the terminal entry, including the parsed reply.
+ * @param {any} d @param {string} command
+ */
+async function query(d, command) {
+  const info = (d.codec.commands?.() ?? []).find((/** @type {any} */ c) => c.name === command);
+  if (!info?.read) throw new Error(`${command} cannot be read.`);
+  const entry = await d.scheduler.terminal(d.id, d.codec.buildRequest(command), { command });
+  rememberReply(d, command, entry, false);
+  queueRender();
+  return entry;
+}
+
+/**
+ * Keep the last reply to every read, so the gauge panel shows it next to the command, and
+ * pick up identity fields as they arrive.
+ * @param {any} d @param {string} command @param {any} entry @param {boolean} isWrite
+ */
+function rememberReply(d, command, entry, isWrite) {
+  if (isWrite || entry.error || !command) return;
+  const parsed = entry.parsed;
+  d.secondary.set(command, { value: parsed?.value, unit: parsed?.unit, formatted: entry.formatted ?? parsed?.formatted, extra: parsed?.extra, t: Date.now() });
+  if (/serial/.test(command) && entry.formatted) d.identity.serial = entry.formatted;
+  if (/firmware|software_version/.test(command) && entry.formatted) d.identity.firmware = entry.formatted;
+}
+
+/**
+ * Writes that belong together (the setpoint editor's Apply): one danger confirmation listing
+ * every frame, then the writes one at a time in order. Resolves with one entry per item, or
+ * null when the user cancels.
+ * @param {any} d
+ * @param {{ command: string, value: any, label?: string, display?: string }[]} items
+ * @param {{ title: string, description?: string, notes?: string[] }} meta
+ */
+async function writeBatch(d, items, meta) {
+  const built = items.map((item) => ({ ...item, bytes: d.codec.buildRequest(item.command, item.value) }));
+  const notes = [...(meta.notes ?? []), ...new Set(items.map((i) => d.spec.notes?.[i.command]).filter(Boolean)), d.spec.notes?._all].filter(Boolean);
+  const ok = await confirmBatch({
+    title: meta.title,
+    device: d.label,
+    description: meta.description,
+    items: built.map((b) => ({ command: b.command, label: b.label, value: b.display ?? b.value, bytes: b.bytes })),
+    notes,
+    source: d.spec.source
+  });
+  if (!ok) return null;
+  const entries = [];
+  for (const b of built) {
+    const record = { t: new Date().toISOString(), device: d.label, command: b.command, value: b.value, bytes: toHex(b.bytes), confirmed: true, response: "" };
+    state.writes.push(record);
+    const entry = await d.scheduler.terminal(d.id, b.bytes, { command: b.command, isWrite: true });
+    record.response = entry.error ?? entry.formatted ?? toHex(entry.response);
+    entries.push({ ...b, entry });
+  }
+  state.dirty = true;
+  queueRender();
+  return entries;
+}
+
+/** @param {any} d */
+function setpointLayout(d) {
+  return d?.turbo ? null : detectSetpoints(d?.codec.commands?.() ?? []);
+}
+
+/** @param {any} d */
+function openSetpoints(d) {
+  if (!d) return toast("Add a device first.", "warn");
+  if (!setpointLayout(d)) return toast(`${d.model} has no setpoint commands this tool knows.`, "warn");
+  openSetpointEditor(app, d);
 }
 
 /** @param {any} d @param {Uint8Array} bytes */
@@ -700,7 +779,7 @@ async function guidedBaudChange(d, baud) {
   const ok = await confirmSend({
     risk: "danger", device: d.label, command: "baud_rate", value: baud, bytes, source: d.spec.source,
     description: `The gauge will switch to ${baud} baud. The tool then closes the port, reopens it at ${baud}, and reads the product name to verify.`,
-    notes: [d.spec.notes?.baud_rate, "🟠 The PID 227 value encoding is not yet confirmed against the INFICON document (V1)."].filter(Boolean)
+    notes: [d.spec.notes?.baud_rate, "🟠 The PID 227 value encoding is not yet confirmed against the manufacturer's protocol document (V1)."].filter(Boolean)
   });
   if (!ok) return;
   const old = d.lineSettings.baudRate;
@@ -849,12 +928,13 @@ function renderPanel() {
 
 function welcome() {
   return h("div.panel", null, h("div.welcome", null,
-    h("h1", null, "Talk to INFICON gauges from the browser"),
-    h("p", null, "Add a SKY CDG, PSG55x, PCG55x or PPG550/570 over RS232 or RS485, watch live values and trends, inspect raw traffic, and export everything — with no installer, and no data leaving this computer."),
+    h("div.welcome-hero", null,
+      h("h1", null, "Talk to your vacuum gauges from the browser"),
+      h("p", null, "Add a SKY CDG, PSG55x, PCG55x or PPG550/570 over RS232 or RS485. Watch live values and trends, send commands from a guided terminal, tune setpoints visually, and export everything. There is no installer, and no data leaves this computer.")),
     h("div.cards", null,
-      h("div.card", null, h("h3", null, "Add gauge"), h("p.hint", null, "Grant a USB serial adapter, scan it with read-only probes, confirm the model and (for a CDG) the full scale."), h("button.button.primary", { type: "button", onclick: () => $("#addGaugeButton").click() }, "Add gauge")),
-      h("div.card", null, h("h3", null, "Try the demo"), h("p.hint", null, "A simulated CDG045D, PCG550 and PSG550 in a pump-down, running the real codecs and scheduler."), h("button.button", { type: "button", onclick: startDemo }, "Try demo")),
-      h("div.card", null, h("h3", null, "Restore a session"), h("p.hint", null, "Sessions autosave to this browser and can be exported as JSON."), h("button.button", { type: "button", onclick: openSessions }, "Sessions")))));
+      h("div.card", null, h("span.num", null, "01"), h("h3", null, "Add a gauge"), h("p.hint", null, "Grant a USB serial adapter, scan it with read-only probes, then confirm the model and, for a CDG, the full scale."), h("button.button.primary", { type: "button", onclick: () => $("#addGaugeButton").click() }, "Add gauge")),
+      h("div.card", null, h("span.num", null, "02"), h("h3", null, "Try the demo"), h("p.hint", null, "A simulated CDG045D, PCG550 and PSG550 in a pump-down, running the real codecs and scheduler. Open the CDG's setpoint editor to see the hysteresis view."), h("button.button", { type: "button", onclick: startDemo }, "Try demo")),
+      h("div.card", null, h("span.num", null, "03"), h("h3", null, "Restore a session"), h("p.hint", null, "Sessions autosave to this browser and can be exported as JSON."), h("button.button", { type: "button", onclick: openSessions }, "Sessions")))));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -941,9 +1021,13 @@ function openHelp() {
       h("p", null, "Every command carries a risk class. Safe reads send immediately; caution commands show the exact bytes; danger commands (adjustments, resets, setpoints, baud rate, turbo actuation) also explain what will happen and need a second click. Changing the display unit never writes to a gauge. Version 1 performs no automatic writes."),
       h("h3", null, "Data"),
       h("p", null, "Sessions autosave to this browser's IndexedDB. Export session JSON, a transcript, traffic CSV with exact bytes, and measurement CSV (per device or merged on the union of timestamps). Every export header records the app build, each device's model, address and full scale, and where the full scale came from."),
+      h("h3", null, "Terminal"),
+      h("p", null, "Quick buttons send any read with one click; the pencil buttons load a write into the composer. Pick a command, choose Read or Write, then pick a value from the list or type your own. The exact bytes are shown before anything is sent. Star a command and value to pin it as a quick button. In the raw field, the up and down arrows recall earlier frames."),
+      h("h3", null, "Setpoints"),
+      h("p", null, "For gauges with setpoint relays, the Setpoints button opens an editor. You can drag the switch-on and switch-off lines, drag the shaded band to move both, use the sliders or arrows, or type a pressure. The illustrative pump-down curve shows where each relay would switch and how it holds inside the hysteresis band. Apply sends every change after one confirmation, then reads the values back."),
       h("h3", null, "Keyboard"),
-      h("p", null, h("code", null, "Ctrl K"), " opens the command dictionary for the current device."),
-      h("div.callout.warn", null, "Items marked 🟠 in the specs (for example the PxG55x CRC and Fixs32en20 decode) come from an OEM document used as a proxy and still need a bench check against the INFICON protocol document.")
+      h("p", null, h("code", null, "Ctrl K"), " opens the command dictionary for the current device. ", h("code", null, "Enter"), " in the terminal sends."),
+      h("div.callout.warn", null, "Items marked 🟠 in the specs (for example the PxG55x CRC and Fixs32en20 decode) come from an OEM document used as a proxy, and still need a bench check against the manufacturer's protocol document.")
     ]
   });
 }

@@ -18,12 +18,12 @@ const CODECS = {
 /** Human names for protocol families, used in the UI. */
 export const FAMILY_LABELS = {
   cdg_serial: "SKY CDG (RS232C binary)",
-  inficon_binary: "INFICON binary (PxG55x)",
-  pfeiffer_binary: "INFICON binary (PxG55x)",
+  inficon_binary: "PxG55x binary",
+  pfeiffer_binary: "PxG55x binary",
   ppg_ascii: "PPG ASCII",
   pfeiffer_ascii: "Pfeiffer ASCII",
   inficon_ascii: "Pfeiffer ASCII",
-  inficon_p3_v02: "INFICON P3 V02"
+  inficon_p3_v02: "P3 V02 binary"
 };
 
 export class DeviceNotFound extends Error {}

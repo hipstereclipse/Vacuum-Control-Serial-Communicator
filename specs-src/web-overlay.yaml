@@ -68,7 +68,7 @@ models:
   BCG552:
     source: CSC device_specs; LogFixs32en26 decode 🟠 V11
   OPG550:
-    source: CSC inficon_p3_v02.py and device_specs (🟠 V13)
+    source: CSC P3 V02 codec and device_specs (🟠 V13)
     probe: p3v02
   TC600:
     source: CSC tc600_protocol.py and device_specs

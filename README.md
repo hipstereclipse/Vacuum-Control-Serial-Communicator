@@ -12,7 +12,13 @@ The design, the sources behind every protocol figure and the open verification i
 - **Scan** granted ports with read-only probes. The scan listens for a CDG left streaming, then tries PPG, Pfeiffer ASCII, CDG, PxG55x and P3 V02 in turn and stops at the first verified identity. It also offers an optional RS485 address sweep.
 - **Map models automatically.** For a CDG the tool infers the full scale from the type word, but it will not log until you confirm the full scale, with Torr-native and mbar-native heads listed side by side.
 - **Poll** one or more read commands per device on a chosen interval. CDGs stream continuously and every frame is decoded.
-- **Device tabs** show a value card with status chips (CDG warnings, PPG status words, PxG55x device errors), a trend, poll controls, and a protocol-aware terminal. The terminal has ASCII and hex views and a frame builder that computes checksums and CRCs and flags a bad frame before it is sent.
+- **Device tabs** put everything about one gauge on one page:
+  - a live value with status chips (CDG warnings, PPG status words, PxG55x device errors), session min/max/rate, and where the reading sits in the gauge's measuring range;
+  - a gauge information panel (identity, full scale, line settings, source document) with a one-click identity read;
+  - a readings table listing every read command with its last reply, a one-click read and a poll toggle;
+  - a trend.
+- **Terminal.** Quick buttons send any read in one click, and pencil buttons load a write into the composer. In the composer you pick a command, choose Read or Write, and then pick a value from a list worked out from the spec (options, ranges, the accepted words in the description) or type your own. Pressures can be entered in any unit. The exact bytes and the risk class show before sending. You can pin a command and value as a quick button, reuse recent commands, recall earlier raw frames with ↑/↓, filter or copy the log, and switch between ASCII and hex views. The raw frame builder computes checksums and CRCs and flags a bad frame before it is sent.
+- **Setpoint editor** (SKY CDG and PPG550/570). Each switch-on and switch-off level can be dragged on the plot, moved together by dragging the shaded hysteresis band, set with a slider, nudged with ± buttons, the arrow keys or the mouse wheel, or typed as a pressure (or, on a CDG, as the raw byte). The hysteresis can be typed as a percentage or picked from presets. An illustrative vacuum cycle (pump-down into a valley, a gas burst, a vent) shows where each relay switches, with relay-state lanes underneath showing it hold inside the band. It also shows the live pressure. Apply writes only what changed, after one danger confirmation, and then verifies by reading back.
 - **Combined view** in overlay, stacked or grid layout, with visibility toggles, per-device colours and synchronised navigation.
 - **Sessions** autosave to this browser's IndexedDB, and can be exported and imported as JSON.
 - **Exports:** measurement CSV (per device, or merged on the union of timestamps), traffic CSV with exact bytes, a readable transcript, and session JSON. Every export header records the build, each device's model, address and full scale, and where the full scale came from.
@@ -100,7 +106,8 @@ The YAML in `specs-src/` stays syncable with CSC's `device_specs/`. Web-only fie
 
 Items marked 🟠 come from a document other than the INFICON primary document for that device. Before a model leaves experimental status, each must be checked against the manual and on the bench. They are listed in [WEB_PORT_PLAN.md, section 16](WEB_PORT_PLAN.md). The most important are:
 - **V1–V5:** the PxG55x protocol against the INFICON "PxG55x Communication Protocol RS232C/RS485C" document.
-- **V6–V8:** the CDG status byte, the setpoint write encoding and the stream rate, from TIRA49E1.
+- **V6–V8:** the CDG status byte, the setpoint write encoding and the stream rate, from TIRA49E1. The setpoint editor uses CSC's cube law, p = FS·(raw/255)³, until V7 is checked.
+- **V14:** for the PPG550/570, whether the setpoint hysteresis register holds the absolute release pressure or an offset from the setpoint. The editor lets you pick either and defaults to the absolute pressure.
 - **V15:** Web Serial behaviour in a soak test.
 
 ## Privacy and disclaimer

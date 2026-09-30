@@ -64,3 +64,58 @@ export function confirmSend(request) {
     });
   });
 }
+
+/**
+ * One danger confirmation for a group of writes that belong together (the setpoint editor's
+ * Apply): every command, its value and its exact bytes are listed, and the same arm-then-send
+ * second click is needed before anything is written.
+ * @param {{
+ *   title: string,
+ *   device: string,
+ *   description?: string,
+ *   items: { command: string, label?: string, value?: any, bytes: Uint8Array }[],
+ *   notes?: string[],
+ *   source?: string,
+ * }} request
+ * @returns {Promise<boolean>}
+ */
+export function confirmBatch(request) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (/** @type {boolean} */ ok) => {
+      if (settled) return;
+      settled = true;
+      closeDialog("confirmDialog");
+      resolve(ok);
+    };
+    let armed = false;
+    const sendButton = /** @type {HTMLButtonElement} */ (h("button.button.danger", { type: "button" }, "I understand — arm"));
+    sendButton.onclick = () => {
+      if (!armed) {
+        armed = true;
+        sendButton.textContent = `Send ${request.items.length} write${request.items.length === 1 ? "" : "s"} now`;
+        sendButton.focus();
+        return;
+      }
+      finish(true);
+    };
+    openDialog("confirmDialog", {
+      title: request.title,
+      body: [
+        h("div", null, h("span.risk.danger", null, "danger"), " ", h("strong", null, request.device)),
+        request.description ? h("p", null, request.description) : null,
+        h("div.callout.danger", null,
+          h("strong", null, "This changes the gauge. "),
+          "Setpoint relays may be wired into valve or pump interlocks. The writes are sent one at a time, in this order, and read back afterwards. Nothing is written until you arm and send."),
+        ...(request.notes ?? []).map((n) => h("div.callout.warn", null, n)),
+        h("div.batch-list", null, request.items.map((item) => h("div.batch-item", null,
+          h("span", null, h("strong", null, item.label ?? item.command), " ", h("span.hint", null, item.command)),
+          h("span.mono", null, item.value === undefined || item.value === "" ? "" : String(item.value)),
+          h("code", null, `${toHex(item.bytes)}   ${printable(item.bytes)}`)))),
+        request.source ? h("div.hint", null, `Source: ${request.source}`) : null
+      ],
+      actions: [h("button.button", { type: "button", onclick: () => finish(false) }, "Cancel"), sendButton],
+      onClose: () => finish(false)
+    });
+  });
+}

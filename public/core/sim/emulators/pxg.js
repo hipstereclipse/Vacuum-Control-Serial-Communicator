@@ -50,7 +50,7 @@ export function createPxgEmulator(options = {}) {
     224: { read: () => Uint8Array.of(state.unit), write: (d) => (d[0] <= 4 ? void (state.unit = d[0]) : 2) },
     207: { read: () => ascii(options.serial ?? "44001234") },
     208: { read: () => ascii(model) },
-    209: { read: () => ascii("INFICON") },
+    209: { read: () => ascii("SIMULATED") },
     218: { read: () => ascii(options.firmware ?? "1.07") },
     104: { read: () => int32BE(Math.round(state.runHours * 4)) },
     227: { read: () => int32BE(state.baud), write: (d) => void (state.baud = ((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) >>> 0) },

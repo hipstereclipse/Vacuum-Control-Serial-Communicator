@@ -41,7 +41,7 @@ import {
  * @typedef {Object} ScanResult
  * @property {string} family
  * @property {string} model          best model match in the registry ("" when unclassified)
- * @property {string} modelHint      what the scan saw, e.g. "INFICON CDG045D"
+ * @property {string} modelHint      what the scan saw, e.g. "CDG045D"
  * @property {number} baudRate
  * @property {"RS232" | "RS485"} rsMode
  * @property {number} address
@@ -229,7 +229,7 @@ async function runStep(step, line, ctx) {
       return {
         family: "pfeiffer_ascii",
         model: registryModel(ctx.registry, hint),
-        modelHint: hint ? (hint === "TC600" ? "TC600 (Turbo)" : `INFICON ${hint}`) : firmware ? `INFICON gauge (${firmware.slice(0, 6).trim()})` : "Unknown Pfeiffer ASCII",
+        modelHint: hint ? (hint === "TC600" ? "TC600 (Turbo)" : hint) : firmware ? `Gauge (${firmware.slice(0, 6).trim()})` : "Unknown Pfeiffer ASCII",
         baudRate: ctx.baudRate,
         rsMode: ctx.rsMode,
         address: 1,
@@ -267,7 +267,7 @@ function cdgResult(frame, typeFrame, ctx, streaming) {
   return {
     family: "cdg_serial",
     model: id.model && registryModel(ctx.registry, id.model) ? id.model : "",
-    modelHint: id.model ? `INFICON ${id.model}` : "INFICON CDG (unclassified)",
+    modelHint: id.model || "CDG (unclassified)",
     baudRate: ctx.baudRate,
     rsMode: "RS232",
     address: 0,
@@ -300,7 +300,7 @@ async function identifyPpg(line, fvFrame, ctx, address = PPG_BROADCAST_ADDRESS) 
   return {
     family: "ppg_ascii",
     model: registryModel(ctx.registry, "PPG570") ? "PPG570" : "",
-    modelHint: "INFICON PPG550/570",
+    modelHint: "PPG550/570",
     baudRate: ctx.baudRate,
     rsMode: ctx.rsMode,
     address,
@@ -347,7 +347,7 @@ async function probePxg(line, address, ctx) {
   return {
     family: "inficon_binary",
     model,
-    modelHint: product ? `INFICON ${product}` : "INFICON binary gauge",
+    modelHint: product || "PxG55x binary gauge",
     baudRate: ctx.baudRate,
     rsMode: ctx.rsMode,
     address,
@@ -384,13 +384,13 @@ async function probeP3(line, ctx) {
   return {
     family: "inficon_p3_v02",
     model: registryModel(ctx.registry, product) ? product.toUpperCase() : "",
-    modelHint: `INFICON ${product}`,
+    modelHint: product,
     baudRate: ctx.baudRate,
     rsMode: ctx.rsMode,
     address: 0,
     firmware,
     serial,
-    description: [firmware && `FW: ${firmware}`, serial && `SN: ${serial}`, manufacturer].filter(Boolean).join("  |  ") || `INFICON ${product}`,
+    description: [firmware && `FW: ${firmware}`, serial && `SN: ${serial}`, manufacturer].filter(Boolean).join("  |  ") || product,
     meta: { product, manufacturer }
   };
 }
@@ -426,7 +426,7 @@ export async function sweepAddresses(port, options) {
             const firmware = pfaData(fw).trim();
             const hint = pfaModelHint(firmware);
             results.push({
-              family: "pfeiffer_ascii", model: registryModel(ctx.registry, hint), modelHint: hint ? `INFICON ${hint}` : "Pfeiffer ASCII device",
+              family: "pfeiffer_ascii", model: registryModel(ctx.registry, hint), modelHint: hint || "Pfeiffer ASCII device",
               baudRate: ctx.baudRate, rsMode: "RS485", address, firmware, description: `FW: ${firmware}`, meta: {}
             });
           }

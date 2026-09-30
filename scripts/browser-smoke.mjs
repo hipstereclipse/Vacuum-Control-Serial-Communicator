@@ -112,7 +112,7 @@ try {
     items[1].click();
     await pauseIn(300);
     const composer = document.querySelector(".composer");
-    const select = composer.querySelectorAll("select")[1];
+    const select = composer.querySelector('select[aria-label="Command"]');
     select.value = "product_name";
     select.dispatchEvent(new Event("change"));
     const preview = composer.querySelector(".byte-preview").textContent;

@@ -107,6 +107,7 @@ export function stamp() {
  * @property {string} wall
  * @property {string} command         empty for raw custom frames
  * @property {string=} formatted
+ * @property {Reading=} parsed          the decoded reply, for editors that need the value or extra fields
  * @property {string=} error
  * @property {boolean=} autoPoll
  */

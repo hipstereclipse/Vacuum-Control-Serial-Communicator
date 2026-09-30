@@ -32,7 +32,9 @@ export function createCdgEmulator(options = {}) {
     fullScaleMbar: options.fullScaleMbar ?? 13.332,
     pressure: options.pressure ?? (() => 1.0),
     unit: 0,
-    setpoints: [0, 0, 0, 0],
+    // SP1 low/high, SP2 low/high as raw bytes; on a 10 Torr head (cube law) about
+    // 0.17/0.34 mbar and 1.4/2.2 mbar, so a simulated pump-down crosses both.
+    setpoints: [60, 75, 120, 140],
     streaming: Boolean(options.streaming),
     errorByte: options.errorByte ?? (() => 0),
     lastRead: 0x00,

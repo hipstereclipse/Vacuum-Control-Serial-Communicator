@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 // Files in public/ are not content-hashed by the static export. Bump this with every deploy
 // so the page and the client modules stay in lockstep.
-const publicClientVersion = "20260930-initial-port";
+const publicClientVersion = "20260930-brand-terminal-setpoints";
 
 function Icon({ name, size = 18 }) {
   const paths = {
@@ -46,6 +46,14 @@ function Icon({ name, size = 18 }) {
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22.5z" />
         <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H13v17h4.5a2.5 2.5 0 0 1 2.5 2.5z" />
       </>
+    ),
+    gauge: (
+      <>
+        <path d="M4.5 17a8.5 8.5 0 1 1 15 0" />
+        <path d="M12 13.2 16.2 8.6" />
+        <circle cx="12" cy="13.5" r="1.4" />
+        <path d="M7.2 12.4h.01M12 7.6h.01M16.8 12.4h.01" />
+      </>
     )
   };
   return (
@@ -55,9 +63,9 @@ function Icon({ name, size = 18 }) {
   );
 }
 
-function Dialog({ id, eyebrow, title, small = false }) {
+function Dialog({ id, eyebrow, title, small = false, wide = false }) {
   return (
-    <dialog className={`modal${small ? " small" : ""}`} id={id} aria-labelledby={`${id}Title`}>
+    <dialog className={`modal${small ? " small" : ""}${wide ? " wide" : ""}`} id={id} aria-labelledby={`${id}Title`}>
       <div className="modal-header">
         <div>
           <p className="eyebrow">{eyebrow}</p>
@@ -79,14 +87,14 @@ export default function Page() {
       <noscript>
         <div className="unsupported card">
           <h1>JavaScript is required</h1>
-          <p>The Gauge Serial Communicator runs entirely in your browser and needs JavaScript enabled.</p>
+          <p>The Gauge Communicator runs entirely in your browser and needs JavaScript enabled.</p>
         </div>
       </noscript>
 
       <div className="unsupported card" id="unsupported" hidden>
         <h1>This browser cannot talk to serial ports</h1>
         <p>
-          The Gauge Serial Communicator uses the Web Serial API, which only desktop Chrome and Microsoft Edge implement.
+          The Gauge Communicator uses the Web Serial API, which only desktop Chrome and Microsoft Edge implement.
           Firefox and Safari do not. Open this page in a current Chrome or Edge, or use the desktop{" "}
           <a href="https://github.com/hipstereclipse/CustomSerialCommunicator">CustomSerialCommunicator</a>.
         </p>
@@ -99,11 +107,11 @@ export default function Page() {
         <header className="topbar">
           <div className="brand">
             <span className="brand-mark">
-              <Icon name="pulse" />
+              <Icon name="gauge" size={22} />
             </span>
             <span>
-              Gauge Serial Communicator
-              <small>INFICON gauges over Web Serial</small>
+              Gauge Communicator
+              <small>Vacuum gauges over Web Serial</small>
             </span>
           </div>
           <div className="grow" />
@@ -173,6 +181,7 @@ export default function Page() {
       <Dialog id="sessionsDialog" eyebrow="IndexedDB" title="Saved sessions" small />
       <Dialog id="helpDialog" eyebrow="Help" title="How this tool works" />
       <Dialog id="dictionaryDialog" eyebrow="Command dictionary" title="Commands" />
+      <Dialog id="setpointDialog" eyebrow="Setpoints" title="Setpoint editor" wide />
 
       <div className="toast-region" id="toastRegion" aria-live="polite" />
       <Script src={`./app.js?v=${publicClientVersion}`} type="module" strategy="afterInteractive" />

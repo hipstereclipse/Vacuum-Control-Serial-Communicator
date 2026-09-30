@@ -92,7 +92,7 @@ export function probePlan(mode = "quick") {
   /** @type {{ step: string, baudRate: number, label: string }[]} */
   const plan = [
     { step: "listen", baudRate: SCAN_BASE_BAUD, label: "listening for a CDG left streaming" },
-    { step: "ppg", baudRate: SCAN_BASE_BAUD, label: "trying INFICON PPG ASCII commands" },
+    { step: "ppg", baudRate: SCAN_BASE_BAUD, label: "trying PPG ASCII commands" },
     { step: "pfeiffer", baudRate: SCAN_BASE_BAUD, label: "trying Pfeiffer ASCII identification" },
     { step: "cdg", baudRate: SCAN_BASE_BAUD, label: "checking for CDG/HPG SKY binary frames" }
   ];
@@ -102,6 +102,6 @@ export function probePlan(mode = "quick") {
     if (mode === "quick" && baud !== 57600) continue;
     plan.push({ step: "pxg", baudRate: baud, label: `trying PxG55x binary at ${baud} baud` });
   }
-  plan.push({ step: "p3v02", baudRate: P3V02_BAUD, label: "trying INFICON P3 V02 at 115200 baud for OPG550" });
+  plan.push({ step: "p3v02", baudRate: P3V02_BAUD, label: "trying P3 V02 at 115200 baud for OPG550" });
   return plan;
 }

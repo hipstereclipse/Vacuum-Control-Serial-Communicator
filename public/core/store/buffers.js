@@ -170,7 +170,8 @@ export function decimate(series, from, to, columns) {
       return out;
     }
     const c = Math.floor(((t - from) / span) * columns);
-    if (c !== col) {
+    // A sample just before the window lands in column -1, the initial `col`: open a bucket anyway.
+    if (c !== col || !bucket) {
       flush();
       col = c;
       bucket = { first: i, min: i, max: i, last: i };

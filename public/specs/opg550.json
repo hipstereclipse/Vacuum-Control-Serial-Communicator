@@ -31,7 +31,7 @@
       "unit": "mbar",
       "description": "Optical Pirani pressure measurement",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "product_name": {
       "pid": 10001,
@@ -40,7 +40,7 @@
       "data_type": "string",
       "description": "Product name",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "software_version": {
       "pid": 10004,
@@ -49,7 +49,7 @@
       "data_type": "string",
       "description": "Firmware version",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "bootloader_version": {
       "pid": 10003,
@@ -58,7 +58,7 @@
       "data_type": "string",
       "description": "Bootloader firmware version",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "serial_number": {
       "pid": 10002,
@@ -67,7 +67,7 @@
       "data_type": "string",
       "description": "Device serial number",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "manufacturer_name": {
       "pid": 10000,
@@ -76,7 +76,7 @@
       "data_type": "string",
       "description": "Manufacturer name",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "error_status": {
       "pid": 11000,
@@ -90,7 +90,7 @@
         "2": "Failure"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "error_history_size": {
       "pid": 11001,
@@ -99,7 +99,7 @@
       "data_type": "uint32_be",
       "description": "Error history buffer size",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "error_count": {
       "pid": 11002,
@@ -108,7 +108,7 @@
       "data_type": "uint32_be",
       "description": "Number of stored errors",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "plasma_interlock_state": {
       "pid": 12001,
@@ -121,7 +121,7 @@
         "1": "Active"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "plasma_interlock_enable": {
       "pid": 12000,
@@ -134,7 +134,7 @@
         "1": "Plasma interlock ON"
       },
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "plasma_enable": {
       "pid": 12002,
@@ -147,7 +147,7 @@
         "1": "Plasma ON"
       },
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "plasma_state": {
       "pid": 12003,
@@ -161,7 +161,7 @@
         "2": "Plasma ON and ignited"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spectrometer_pixel_count": {
       "pid": 13000,
@@ -170,7 +170,7 @@
       "data_type": "uint16_be",
       "description": "Spectrometer pixel count",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "master_data_unit": {
       "pid": 14001,
@@ -185,7 +185,7 @@
         "4": "micron"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "operating_mode": {
       "pid": 19000,
@@ -200,7 +200,7 @@
         "3": "Automatic RGD"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "all_algorithms_off": {
       "pid": 19100,
@@ -209,7 +209,7 @@
       "data_type": "opg_all_algorithms_off",
       "description": "Deactivate all OPG550 analysis algorithms",
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spec_state": {
       "pid": 20001,
@@ -227,7 +227,7 @@
         "255": "Not active (ERROR)"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spec_enable": {
       "pid": 20000,
@@ -236,7 +236,7 @@
       "data_type": "opg_spec_enable",
       "description": "Enable or disable SPEC measurement; value 1 starts endless acquisition, value 0 stops it",
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spec_buffer_size": {
       "pid": 20002,
@@ -245,7 +245,7 @@
       "data_type": "uint32_be",
       "description": "Maximum number of SPEC records stored",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spec_record_count": {
       "pid": 20003,
@@ -254,7 +254,7 @@
       "data_type": "uint32_be",
       "description": "Number of captured SPEC records",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "spec_record": {
       "pid": 20004,
@@ -274,7 +274,7 @@
       ],
       "description": "Read the latest SPEC optical spectrum record",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "ror_state": {
       "pid": 21001,
@@ -291,7 +291,7 @@
         "255": "Not active (ERROR)"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "ror_enable": {
       "pid": 21000,
@@ -300,7 +300,7 @@
       "data_type": "opg_ror_enable",
       "description": "Enable or disable RoR measurement; value 1 starts endless acquisition, value 0 stops it",
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "ror_buffer_size": {
       "pid": 21002,
@@ -309,7 +309,7 @@
       "data_type": "uint32_be",
       "description": "Maximum number of RoR records stored",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "ror_record_count": {
       "pid": 21003,
@@ -318,7 +318,7 @@
       "data_type": "uint32_be",
       "description": "Number of captured RoR records",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "ror_record": {
       "pid": 21004,
@@ -342,7 +342,7 @@
       ],
       "description": "Read the latest RoR record including spectrum, pressure rise, and leak-rate numbers",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "rgd_state": {
       "pid": 22001,
@@ -360,7 +360,7 @@
         "255": "Not active (ERROR)"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "rgd_enable": {
       "pid": 22000,
@@ -369,7 +369,7 @@
       "data_type": "opg_rgd_enable",
       "description": "Enable or disable RGD measurement; value 1 starts endless acquisition, value 0 stops it",
       "risk": "caution",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "rgd_buffer_size": {
       "pid": 22002,
@@ -378,7 +378,7 @@
       "data_type": "uint32_be",
       "description": "Maximum number of RGD records stored",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "rgd_record_count": {
       "pid": 22003,
@@ -387,7 +387,7 @@
       "data_type": "uint32_be",
       "description": "Number of captured RGD records",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "rgd_record": {
       "pid": 22004,
@@ -415,7 +415,7 @@
       ],
       "description": "Read the latest RGD record including spectrum, gas intensities, partial pressures, and ratios",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "analog_output_mode": {
       "pid": 30000,
@@ -444,7 +444,7 @@
         "17": "RGD Ratio Switch"
       },
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     },
     "analog_output_voltage": {
       "pid": 30001,
@@ -454,11 +454,11 @@
       "unit": "mV",
       "description": "Analog output target voltage",
       "risk": "safe",
-      "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)"
+      "source": "CSC P3 V02 codec and device_specs (🟠 V13)"
     }
   },
   "device_class": "gauge",
-  "source": "CSC inficon_p3_v02.py and device_specs (🟠 V13)",
+  "source": "CSC P3 V02 codec and device_specs (🟠 V13)",
   "default_unit": "mbar",
   "probe": "p3v02",
   "notes": {}

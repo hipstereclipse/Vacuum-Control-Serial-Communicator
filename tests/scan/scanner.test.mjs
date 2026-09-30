@@ -81,7 +81,7 @@ test("PSG550 reset to 19200 is only found by a thorough scan", async () => {
 test("PPG570 answers at the broadcast address and is offered as the combined PPG550/570", async () => {
   const { results } = await scan([createPpgEmulator({ model: "PPG570", serial: "S123", firmware: "1.2" })]);
   assert.equal(results[0].family, "ppg_ascii");
-  assert.equal(results[0].modelHint, "INFICON PPG550/570");
+  assert.equal(results[0].modelHint, "PPG550/570");
   assert.equal(results[0].serial, "S123");
   assert.equal(results[0].meta.pr1Acked, true);
 });

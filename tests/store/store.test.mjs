@@ -30,6 +30,15 @@ test("decimation keeps spikes and bounds the point count", () => {
   assert.ok(points.some((p) => p.v === 1000));
 });
 
+test("decimate keeps the samples just before the window without throwing", () => {
+  const s = new Series("b");
+  // Two samples before `from` fall in column -1, the decimator's initial column.
+  for (const t of [990, 995, 1000, 1500, 2000]) s.push(t, t / 1000);
+  const points = decimate(s, 999, 2000, 10);
+  assert.ok(points.some((p) => p.t === 995));
+  assert.ok(points.some((p) => p.t === 2000));
+});
+
 test("statusFromWarnings maps codec warnings to sample status", () => {
   assert.equal(statusFromWarnings(["overrange"]), SAMPLE_STATUS.OVERRANGE);
   assert.equal(statusFromWarnings(["sensor not ready"]), SAMPLE_STATUS.WARNING);

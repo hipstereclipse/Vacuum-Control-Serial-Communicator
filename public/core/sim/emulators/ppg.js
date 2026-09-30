@@ -31,6 +31,7 @@ const MBAR_TO = { MBAR: 1, TORR: 1 / 1.33322387415, PASCAL: 100 };
  *   baudRate?: number,
  *   serial?: string,
  *   firmware?: string,
+ *   manufacturer?: string,
  *   responseDelayMs?: number,
  * }} [options]
  * @returns {import("../../transport/emulated-port.js").Emulator}
@@ -69,6 +70,36 @@ export function createPpgEmulator(options = {}) {
   const vac = () => Math.max(0, state.pressure() - state.zeroOffset);
 
   /**
+   * Factory-like setpoint registers so a fresh simulated gauge has something to show:
+   * SP1 1E+1, SP2 1E-1, SP3 1E-2 mbar, switching BELOW, release 10 % above (🟠 V14).
+   * @param {string} kind  SP/SPV value, SH/SPH hysteresis, SD/SPD direction, EN/SPE enable, SPS source
+   * @param {number} index
+   */
+  function setpointDefault(kind, index) {
+    const value = [1e1, 1e-1, 1e-2][index - 1] ?? 1;
+    if (kind === "SP" || kind === "SPV") return fmtRaw(value);
+    if (kind === "SH" || kind === "SPH") return fmtRaw(value * 1.1);
+    if (kind === "SD" || kind === "SPD") return "BELOW";
+    if (kind === "EN" || kind === "SPE") return index === 3 ? "OFF" : "ON";
+    if (kind === "SPS") return "CMB";
+    return "0.00E+00";
+  }
+
+  /** PPG570 SPR: the relay as the gauge would report it, from the live pressure. @param {number} index */
+  function relayStatus(index) {
+    const reg = (/** @type {string} */ m) => state.setpoints[`${m}${index}`] ?? setpointDefault(m, index);
+    if (reg("SPE") === "OFF") return "OFF";
+    const threshold = Number(reg("SPV"));
+    const p = vac();
+    return (reg("SPD") === "ABOVE" ? p > threshold : p < threshold) ? "ON" : "OFF";
+  }
+
+  /** @param {number} mbar */
+  function fmtRaw(mbar) {
+    return mbar.toExponential(2).toUpperCase().replace(/E([+-])(\d)$/, "E$10$2");
+  }
+
+  /**
    * @param {string} mnemonic @param {"?" | "!"} action @param {string} param
    * @returns {string | { nak: string }}
    */
@@ -83,7 +114,7 @@ export function createPpgEmulator(options = {}) {
       case "PN":
         return read ? (is570 ? "3PP1-100-1100" : "3PP1-000-1100") : unknown;
       case "MF":
-        return read ? "INFICON" : unknown;
+        return read ? options.manufacturer ?? "SIMULATED" : unknown;
       case "MD":
         return read ? model : unknown;
       case "T":
@@ -150,13 +181,13 @@ export function createPpgEmulator(options = {}) {
     }
     // Setpoints: PPG550 SP1/SD1/EN1/SH1; PPG570 SPV/SPH/SPD/SPE/SPS/SPR with an index.
     if (/^(SP|SD|EN|SH)[1-3]$/.test(mnemonic) && !is570) {
-      if (read) return state.setpoints[mnemonic] ?? "0.00E+00";
+      if (read) return state.setpoints[mnemonic] ?? setpointDefault(mnemonic.slice(0, 2), Number(mnemonic[2]));
       state.setpoints[mnemonic] = param;
       return param;
     }
     if (/^SP[VHDESR]$/.test(mnemonic) && is570) {
-      if (read) return state.setpoints[`${mnemonic}${param}`] ?? (mnemonic === "SPR" ? "OFF" : "0.00E+00");
-      if (mnemonic === "SPR") return unknown;
+      if (mnemonic === "SPR") return read ? relayStatus(Number(param)) : unknown;
+      if (read) return state.setpoints[`${mnemonic}${param}`] ?? setpointDefault(mnemonic, Number(param));
       const [index, ...rest] = param.split(",");
       if (!/^[1-3]$/.test(index)) return { nak: "INVALID PARAMETER" };
       state.setpoints[`${mnemonic}${index}`] = rest.join(",");

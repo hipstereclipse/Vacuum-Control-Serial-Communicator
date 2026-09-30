@@ -1,24 +1,22 @@
 import "./globals.css";
 
+// Light is the default look (the brand's white-and-blue); a saved choice of dark wins.
 const themeBootScript = `
   (() => {
     try {
       const saved = localStorage.getItem("gauge-communicator-theme");
-      const theme = saved === "light" || saved === "dark"
-        ? saved
-        : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.theme = saved === "dark" ? "dark" : "light";
     } catch {
-      document.documentElement.dataset.theme = "dark";
+      document.documentElement.dataset.theme = "light";
     }
   })();
 `;
 
 export const metadata = {
-  title: "Gauge Serial Communicator",
+  title: "Gauge Communicator",
   description:
-    "A local-first Web Serial console for INFICON vacuum gauges: SKY CDG, PSG55x, PCG55x, PPG550/570 and more.",
-  applicationName: "Gauge Serial Communicator",
+    "A local-first Web Serial console for vacuum gauges: SKY CDG, PSG55x, PCG55x, PPG550/570 and more.",
+  applicationName: "Gauge Communicator",
   manifest: "./manifest.webmanifest",
   icons: {
     icon: "./icon.svg"
@@ -26,8 +24,8 @@ export const metadata = {
 };
 
 export const viewport = {
-  colorScheme: "dark light",
-  themeColor: "#0b1118",
+  colorScheme: "light dark",
+  themeColor: "#124477",
   width: "device-width",
   initialScale: 1
 };
