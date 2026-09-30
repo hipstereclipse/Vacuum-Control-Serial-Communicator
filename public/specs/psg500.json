@@ -1,0 +1,74 @@
+{
+  "model": "PSG500",
+  "manufacturer": "INFICON",
+  "family": "inficon_binary",
+  "protocol": "inficon_binary",
+  "experimental": true,
+  "transport": {
+    "default_baud": 9600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "default_address": 0,
+    "rs485_address_range": [
+      1,
+      255
+    ]
+  },
+  "device_id": 2,
+  "pressure_enc": "fixs32en20",
+  "commands": {
+    "pressure": {
+      "pid": 221,
+      "read": true,
+      "write": false,
+      "measurement": "pressure",
+      "unit": "mbar",
+      "description": "Pirani/Capacitive combination pressure",
+      "risk": "safe",
+      "source": "CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)"
+    },
+    "software_version": {
+      "pid": 218,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Firmware version",
+      "risk": "safe",
+      "source": "CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)"
+    },
+    "serial_number": {
+      "pid": 207,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Device serial number",
+      "risk": "safe",
+      "source": "CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)"
+    },
+    "error_status": {
+      "pid": 228,
+      "read": true,
+      "write": false,
+      "measurement": "error_flags",
+      "flag_names": [
+        "sensor_error",
+        "electronics_error",
+        "calibration_error",
+        "memory_error"
+      ],
+      "description": "Error status bitmap",
+      "risk": "safe",
+      "source": "CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)"
+    }
+  },
+  "device_class": "gauge",
+  "source": "CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)",
+  "default_unit": "mbar",
+  "probe": null,
+  "notes": {}
+}

@@ -1,0 +1,269 @@
+[
+  {
+    "model": "BCG450",
+    "family": "inficon_ascii",
+    "protocol": "inficon_ascii",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "pfeiffer_ascii",
+    "file": "bcg450.json"
+  },
+  {
+    "model": "BCG552",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "bcg552.json"
+  },
+  {
+    "model": "BPG40x",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "bpg40x.json"
+  },
+  {
+    "model": "BPG552",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "bpg552.json"
+  },
+  {
+    "model": "CDG025D",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "cdg025d.json"
+  },
+  {
+    "model": "CDG045D",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "cdg045d.json"
+  },
+  {
+    "model": "CDG100D",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "cdg100d.json"
+  },
+  {
+    "model": "CDG160D",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "cdg160d.json"
+  },
+  {
+    "model": "CDG200D",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "cdg200d.json"
+  },
+  {
+    "model": "HPG400",
+    "family": "cdg_serial",
+    "protocol": "cdg_serial",
+    "device_class": "gauge",
+    "experimental": true,
+    "rs_modes": [
+      "RS232"
+    ],
+    "probe": "cdg",
+    "file": "hpg400.json"
+  },
+  {
+    "model": "MAG500",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "mag500.json"
+  },
+  {
+    "model": "MPG400",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": true,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "mpg400.json"
+  },
+  {
+    "model": "MPG500",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "mpg500.json"
+  },
+  {
+    "model": "OPG550",
+    "family": "inficon_p3_v02",
+    "protocol": "inficon_p3_v02",
+    "device_class": "gauge",
+    "experimental": true,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "p3v02",
+    "file": "opg550.json"
+  },
+  {
+    "model": "PCG550",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "pxg",
+    "file": "pcg550.json"
+  },
+  {
+    "model": "PEG100",
+    "family": "inficon_ascii",
+    "protocol": "inficon_ascii",
+    "device_class": "gauge",
+    "experimental": true,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "peg100.json"
+  },
+  {
+    "model": "PPG550",
+    "family": "inficon_ppg_ascii",
+    "protocol": "ppg_ascii",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "ppg",
+    "file": "ppg550.json"
+  },
+  {
+    "model": "PPG570",
+    "family": "inficon_ppg_ascii",
+    "protocol": "ppg_ascii",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "ppg",
+    "file": "ppg570.json"
+  },
+  {
+    "model": "PSG500",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": true,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": null,
+    "file": "psg500.json"
+  },
+  {
+    "model": "PSG550",
+    "family": "inficon_binary",
+    "protocol": "inficon_binary",
+    "device_class": "gauge",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "pxg",
+    "file": "psg550.json"
+  },
+  {
+    "model": "TC600",
+    "family": "pfeiffer_ascii",
+    "protocol": "pfeiffer_ascii",
+    "device_class": "turbo",
+    "experimental": false,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "probe": "pfeiffer_ascii",
+    "file": "tc600.json"
+  }
+]

@@ -1,0 +1,153 @@
+# DIVERGES FROM CSC device_specs/gauges/pcg550.yaml — back-port once V1 is closed.
+# Rewritten from the PxG55x frame and parameter description in S16 (Agilent TQRA78E1,
+# the OEM document for the same protocol), pending the INFICON "PxG55x Communication
+# Protocol RS232C/RS485C" document (WEB_PORT_PLAN.md 5.3, V1 to V5).
+# Differences from CSC: PID 222 is a Real32 pressure (CSC calls it temperature),
+# PID 228 is the device exception word (CSC's flag names are not in S16), baud 57600.
+model: PCG550
+manufacturer: INFICON
+family: inficon_binary
+protocol: inficon_binary
+transport:
+  default_baud: 57600          # 🟠 V2: S16 factory setting; selectable 9600-57600 via PID 227
+  parity: N
+  data_bits: 8
+  stop_bits: 1
+  rs_modes: [RS232, RS485]
+  default_address: 0           # RS232 address is always 0 (S16)
+  rs485_address_range: [1, 255]  # 🟠 V2: range not in S16
+device_id: 0x02                # S16: PCG-7xx device ID 2; responses carry it, requests carry 0x00
+pressure_enc: fixs32en20
+commands:
+  pressure:
+    pid: 221
+    read: true
+    write: false
+    data_type: fixs32en20
+    measurement: pressure
+    unit: mbar                 # 🟠 V3: presumed always mbar; PID 224 changes only Real32 pressures
+    description: Pressure, Fixs32en20 (linear, value / 2^20)
+  pressure_real32:
+    pid: 222
+    read: true
+    write: false
+    data_type: real32
+    unit: data unit
+    description: Pressure as Real32, in the unit set by PID 224
+  data_unit:
+    pid: 224
+    read: true
+    write: true
+    data_type: u8
+    options:
+      - { value: 0, label: mbar }
+      - { value: 1, label: Torr }
+      - { value: 2, label: Pa }
+      - { value: 3, label: micron }
+      - { value: 4, label: counts }
+    description: Data unit for Real32 pressures
+  active_instance:
+    pid: 223
+    read: true
+    write: false
+    data_type: u8
+    options:
+      - { value: 1, label: CDG }
+      - { value: 2, label: Pirani }
+      - { value: 3, label: mixed }
+    description: Sensor currently providing the reading
+  atm_pressure:
+    pid: 265
+    read: true
+    write: false
+    data_type: fixs32en20
+    unit: mbar
+    measurement: pressure
+    description: Atmospheric pressure (CDG sensor)
+  device_exception:
+    pid: 228
+    read: true
+    write: false
+    data_type: u32
+    description: Device exception word (Pirani filament rupture, CDG diaphragm rupture, ...); bit meanings 🟠 V1
+  serial_number:
+    pid: 207
+    read: true
+    write: false
+    data_type: string          # 🟠 V1: data type not confirmed
+    description: Serial number
+  product_name:
+    pid: 208
+    read: true
+    write: false
+    data_type: string
+    description: Product name (used by the scanner, V5)
+  manufacturer:
+    pid: 209
+    read: true
+    write: false
+    data_type: string
+    description: Manufacturer name
+  software_version:
+    pid: 218
+    read: true
+    write: false
+    data_type: string
+    description: Software version
+  run_hours:
+    pid: 104
+    read: true
+    write: false
+    data_type: fixs32en2
+    unit: h
+    description: Operating hours
+  baud_rate:
+    pid: 227
+    read: true
+    write: true
+    data_type: u32             # 🟠 V1: encoding of the baud value not confirmed
+    value_hint: 9600, 19200, 38400 or 57600
+    experimental: true
+    description: Serial baud rate — the link drops until the port is reopened at the new rate
+  cdg_auto_zero:
+    pid: 421
+    read: true
+    write: true
+    data_type: u8
+    options:
+      - { value: 0, label: off }
+      - { value: 1, label: on }
+    experimental: true
+    description: CDG auto zero
+  reset:
+    pid: 103
+    read: false
+    write: true
+    data_type: u8
+    value_hint: see the PxG55x manual for reset / factory-reset values
+    experimental: true
+    description: Device reset and factory reset
+  pirani_adjust:
+    pid: 417
+    read: false
+    write: true
+    data_type: u8
+    write_value: 1
+    experimental: true
+    description: Pirani adjustment (at high vacuum)
+  cdg_zero_adjust:
+    pid: 414
+    read: false
+    write: true
+    data_type: u8
+    write_value: 1
+    experimental: true
+    description: CDG zero adjustment
+  atm_adjust:
+    pid: 448
+    read: false
+    write: true
+    data_type: u8
+    write_value: 1
+    experimental: true
+    description: Atmosphere adjustment

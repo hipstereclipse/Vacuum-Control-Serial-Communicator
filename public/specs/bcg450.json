@@ -1,0 +1,172 @@
+{
+  "model": "BCG450",
+  "manufacturer": "INFICON",
+  "family": "inficon_ascii",
+  "protocol": "inficon_ascii",
+  "transport": {
+    "default_baud": 9600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "default_address": 1,
+    "rs485_address_range": [
+      1,
+      253
+    ]
+  },
+  "commands": {
+    "pressure": {
+      "pid": 340,
+      "read": true,
+      "write": false,
+      "data_type": "u_expo_new",
+      "unit": "mbar",
+      "description": "Active sensor pressure reading",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "gauge_factor": {
+      "pid": 342,
+      "read": true,
+      "write": true,
+      "data_type": "u_real",
+      "description": "Gas correction factor",
+      "risk": "caution",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "sensor_status": {
+      "pid": 223,
+      "read": true,
+      "write": false,
+      "data_type": "u_short_int",
+      "description": "Active sensor status bitmap",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "emission_control": {
+      "pid": 10,
+      "read": true,
+      "write": true,
+      "data_type": "boolean_old",
+      "description": "BA emission on/off",
+      "risk": "danger",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "emission_current": {
+      "pid": 222,
+      "read": true,
+      "write": true,
+      "data_type": "u_expo",
+      "unit": "mA",
+      "description": "BA emission current",
+      "risk": "danger",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "degas": {
+      "pid": 17,
+      "read": false,
+      "write": true,
+      "data_type": "boolean_old",
+      "description": "BA degas on/off",
+      "risk": "danger",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "pressure_units": {
+      "pid": 130,
+      "read": true,
+      "write": true,
+      "data_type": "u_short_int",
+      "description": "Display pressure unit",
+      "options": [
+        {
+          "value": 0,
+          "label": "mbar"
+        },
+        {
+          "value": 1,
+          "label": "Torr"
+        },
+        {
+          "value": 2,
+          "label": "Pa"
+        }
+      ],
+      "risk": "caution",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "zero_adjust": {
+      "pid": 96,
+      "read": false,
+      "write": true,
+      "data_type": "boolean_old",
+      "description": "Execute CDG zero adjustment",
+      "risk": "danger",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "gas_correction": {
+      "pid": 150,
+      "read": true,
+      "write": true,
+      "data_type": "u_real",
+      "description": "Pirani gas correction factor",
+      "risk": "caution",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "error_status": {
+      "pid": 303,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Error code string",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "temperature": {
+      "pid": 216,
+      "read": true,
+      "write": false,
+      "data_type": "u_real",
+      "unit": "°C",
+      "description": "Sensor temperature",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "software_version": {
+      "pid": 312,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Firmware version",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "serial_number": {
+      "pid": 349,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Device serial number",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "rs485_address": {
+      "pid": 797,
+      "read": true,
+      "write": true,
+      "data_type": "u_integer",
+      "description": "RS-485 address",
+      "risk": "danger",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    }
+  },
+  "device_class": "gauge",
+  "experimental": false,
+  "source": "CSC device_specs (not yet checked against the manufacturer document)",
+  "default_unit": "mbar",
+  "probe": "pfeiffer_ascii",
+  "notes": {}
+}

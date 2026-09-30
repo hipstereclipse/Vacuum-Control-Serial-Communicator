@@ -1,0 +1,41 @@
+{
+  "name": "vacuum-control-serial-communicator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "app": "node scripts/launch.mjs",
+    "dev": "vinext dev",
+    "predev": "node scripts/specs-build.mjs && node scripts/write-build-info.mjs",
+    "prebuild:pages": "node scripts/clean-build.mjs && node scripts/specs-build.mjs && node scripts/write-build-info.mjs",
+    "build:pages": "vinext build && node scripts/package-pages.mjs",
+    "preview:pages": "node scripts/serve-pages.mjs",
+    "start": "vinext start",
+    "specs:build": "node scripts/specs-build.mjs",
+    "lint:source": "node scripts/validate-source.mjs",
+    "test:framers": "node scripts/test-framers.mjs",
+    "test:codecs": "node scripts/test-codecs.mjs",
+    "test:scan": "node scripts/test-scan.mjs",
+    "test:scheduler": "node scripts/test-scheduler.mjs",
+    "test:sim": "node scripts/test-sim.mjs",
+    "test:store": "node scripts/test-store.mjs",
+    "test": "node scripts/specs-build.mjs --check && node scripts/validate-source.mjs && node scripts/test-framers.mjs && node scripts/test-codecs.mjs && node scripts/test-scan.mjs && node scripts/test-scheduler.mjs && node scripts/test-sim.mjs && node scripts/test-store.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-server-dom-webpack": "19.2.8",
+    "vinext": "1.0.0-beta.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.0.4",
+    "@vitejs/plugin-rsc": "0.5.32",
+    "vite": "8.1.5",
+    "yaml": "2.8.1"
+  },
+  "overrides": {
+    "postcss": "8.5.24",
+    "sharp": "0.35.3"
+  }
+}

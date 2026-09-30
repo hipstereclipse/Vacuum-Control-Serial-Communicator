@@ -1,0 +1,89 @@
+{
+  "model": "MPG500",
+  "manufacturer": "INFICON",
+  "family": "inficon_binary",
+  "protocol": "inficon_binary",
+  "transport": {
+    "default_baud": 9600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "default_address": 0,
+    "rs485_address_range": [
+      1,
+      255
+    ]
+  },
+  "device_id": 4,
+  "pressure_enc": "logfixs32en26",
+  "commands": {
+    "pressure": {
+      "pid": 340,
+      "read": true,
+      "write": false,
+      "measurement": "pressure",
+      "unit": "mbar",
+      "description": "Combination gauge pressure",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "temperature": {
+      "pid": 216,
+      "read": true,
+      "write": false,
+      "measurement": "temperature",
+      "unit": "°C",
+      "description": "Electronics temperature",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "software_version": {
+      "pid": 312,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Firmware version",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "serial_number": {
+      "pid": 349,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Device serial number",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "error_status": {
+      "pid": 303,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Error code",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "operating_hours": {
+      "pid": 311,
+      "read": true,
+      "write": false,
+      "data_type": "u_integer",
+      "unit": "h",
+      "scale": 0.25,
+      "description": "Operating hours (raw unit = 15 min intervals)",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    }
+  },
+  "device_class": "gauge",
+  "experimental": false,
+  "source": "CSC device_specs (not yet checked against the manufacturer document)",
+  "default_unit": "mbar",
+  "probe": null,
+  "notes": {}
+}

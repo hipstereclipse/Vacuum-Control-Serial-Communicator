@@ -1,0 +1,17 @@
+{
+  "name": "Gauge Serial Communicator",
+  "short_name": "Gauge Communicator",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#071016",
+  "theme_color": "#071016",
+  "description": "Local-first Web Serial console for INFICON vacuum gauges: SKY CDG, PSG55x, PCG55x, PPG550/570 and more.",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

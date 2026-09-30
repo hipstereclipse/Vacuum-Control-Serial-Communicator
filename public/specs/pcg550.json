@@ -1,0 +1,250 @@
+{
+  "model": "PCG550",
+  "manufacturer": "INFICON",
+  "family": "inficon_binary",
+  "protocol": "inficon_binary",
+  "transport": {
+    "default_baud": 57600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "default_address": 0,
+    "rs485_address_range": [
+      1,
+      255
+    ]
+  },
+  "device_id": 2,
+  "pressure_enc": "fixs32en20",
+  "commands": {
+    "pressure": {
+      "pid": 221,
+      "read": true,
+      "write": false,
+      "data_type": "fixs32en20",
+      "measurement": "pressure",
+      "unit": "mbar",
+      "description": "Pressure, Fixs32en20 (linear, value / 2^20)",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "pressure_real32": {
+      "pid": 222,
+      "read": true,
+      "write": false,
+      "data_type": "real32",
+      "unit": "data unit",
+      "description": "Pressure as Real32, in the unit set by PID 224",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "data_unit": {
+      "pid": 224,
+      "read": true,
+      "write": true,
+      "data_type": "u8",
+      "options": [
+        {
+          "value": 0,
+          "label": "mbar"
+        },
+        {
+          "value": 1,
+          "label": "Torr"
+        },
+        {
+          "value": 2,
+          "label": "Pa"
+        },
+        {
+          "value": 3,
+          "label": "micron"
+        },
+        {
+          "value": 4,
+          "label": "counts"
+        }
+      ],
+      "description": "Data unit for Real32 pressures",
+      "risk": "caution",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "active_instance": {
+      "pid": 223,
+      "read": true,
+      "write": false,
+      "data_type": "u8",
+      "options": [
+        {
+          "value": 1,
+          "label": "CDG"
+        },
+        {
+          "value": 2,
+          "label": "Pirani"
+        },
+        {
+          "value": 3,
+          "label": "mixed"
+        }
+      ],
+      "description": "Sensor currently providing the reading",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "atm_pressure": {
+      "pid": 265,
+      "read": true,
+      "write": false,
+      "data_type": "fixs32en20",
+      "unit": "mbar",
+      "measurement": "pressure",
+      "description": "Atmospheric pressure (CDG sensor)",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "device_exception": {
+      "pid": 228,
+      "read": true,
+      "write": false,
+      "data_type": "u32",
+      "description": "Device exception word (Pirani filament rupture, CDG diaphragm rupture, ...); bit meanings 🟠 V1",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "serial_number": {
+      "pid": 207,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Serial number",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "product_name": {
+      "pid": 208,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Product name (used by the scanner, V5)",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "manufacturer": {
+      "pid": 209,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Manufacturer name",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "software_version": {
+      "pid": 218,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Software version",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "run_hours": {
+      "pid": 104,
+      "read": true,
+      "write": false,
+      "data_type": "fixs32en2",
+      "unit": "h",
+      "description": "Operating hours",
+      "risk": "safe",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "baud_rate": {
+      "pid": 227,
+      "read": true,
+      "write": true,
+      "data_type": "u32",
+      "value_hint": "9600, 19200, 38400 or 57600",
+      "experimental": true,
+      "description": "Serial baud rate — the link drops until the port is reopened at the new rate",
+      "risk": "danger",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "cdg_auto_zero": {
+      "pid": 421,
+      "read": true,
+      "write": true,
+      "data_type": "u8",
+      "options": [
+        {
+          "value": 0,
+          "label": "off"
+        },
+        {
+          "value": 1,
+          "label": "on"
+        }
+      ],
+      "experimental": true,
+      "description": "CDG auto zero",
+      "risk": "caution",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "reset": {
+      "pid": 103,
+      "read": false,
+      "write": true,
+      "data_type": "u8",
+      "value_hint": "see the PxG55x manual for reset / factory-reset values",
+      "experimental": true,
+      "description": "Device reset and factory reset",
+      "risk": "danger",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "pirani_adjust": {
+      "pid": 417,
+      "read": false,
+      "write": true,
+      "data_type": "u8",
+      "write_value": 1,
+      "experimental": true,
+      "description": "Pirani adjustment (at high vacuum)",
+      "risk": "danger",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "cdg_zero_adjust": {
+      "pid": 414,
+      "read": false,
+      "write": true,
+      "data_type": "u8",
+      "write_value": 1,
+      "experimental": true,
+      "description": "CDG zero adjustment",
+      "risk": "danger",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    },
+    "atm_adjust": {
+      "pid": 448,
+      "read": false,
+      "write": true,
+      "data_type": "u8",
+      "write_value": 1,
+      "experimental": true,
+      "description": "Atmosphere adjustment",
+      "risk": "danger",
+      "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)"
+    }
+  },
+  "device_class": "gauge",
+  "experimental": false,
+  "source": "TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)",
+  "default_unit": "mbar",
+  "probe": "pxg",
+  "notes": {
+    "baud_rate": "A successful write drops the link. The tool closes the port, reopens it at the new rate and verifies identity; if that fails it reopens at the old rate.",
+    "_all": "Do not operate the gauge through the serial interface and a fieldbus or the diagnostic port at the same time (S16 caution, 🟠 V1)."
+  }
+}

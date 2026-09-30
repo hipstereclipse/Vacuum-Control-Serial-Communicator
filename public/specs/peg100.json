@@ -1,0 +1,66 @@
+{
+  "model": "PEG100",
+  "manufacturer": "INFICON",
+  "family": "inficon_ascii",
+  "protocol": "inficon_ascii",
+  "experimental": true,
+  "transport": {
+    "default_baud": 9600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232",
+      "RS485"
+    ],
+    "default_address": 1,
+    "rs485_address_range": [
+      1,
+      253
+    ]
+  },
+  "commands": {
+    "pressure": {
+      "pid": 340,
+      "read": true,
+      "write": false,
+      "data_type": "u_expo_new",
+      "unit": "mbar",
+      "description": "Pirani pressure measurement",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "software_version": {
+      "pid": 312,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Firmware version",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "serial_number": {
+      "pid": 349,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Device serial number",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    },
+    "error_status": {
+      "pid": 303,
+      "read": true,
+      "write": false,
+      "data_type": "string",
+      "description": "Error code",
+      "risk": "safe",
+      "source": "CSC device_specs (not yet checked against the manufacturer document)"
+    }
+  },
+  "device_class": "gauge",
+  "source": "CSC device_specs (not yet checked against the manufacturer document)",
+  "default_unit": "mbar",
+  "probe": null,
+  "notes": {}
+}

@@ -1,0 +1,152 @@
+{
+  "model": "CDG200D",
+  "manufacturer": "INFICON",
+  "family": "cdg_serial",
+  "protocol": "cdg_serial",
+  "full_scale_mbar": 1.3332,
+  "full_scale_options_mbar": [
+    0.1,
+    0.13332,
+    1,
+    1.3332,
+    10,
+    13.332,
+    100,
+    133.32,
+    1100,
+    1333.22
+  ],
+  "transport": {
+    "default_baud": 9600,
+    "parity": "N",
+    "data_bits": 8,
+    "stop_bits": 1,
+    "rs_modes": [
+      "RS232"
+    ],
+    "default_address": 0
+  },
+  "commands": {
+    "pressure": {
+      "read": true,
+      "write": false,
+      "unit": "mbar",
+      "description": "Continuous pressure measurement (streamed)",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "cdg_type": {
+      "read": true,
+      "write": false,
+      "description": "Query gauge full-scale / type code",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "firmware": {
+      "read": true,
+      "write": false,
+      "description": "Query firmware revision",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "serial_number": {
+      "read": true,
+      "write": false,
+      "description": "Query gauge serial number",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "unit": {
+      "read": false,
+      "write": true,
+      "description": "Set pressure unit (0=mbar, 1=Torr, 2=Pa)",
+      "risk": "caution",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_1_low": {
+      "read": false,
+      "write": true,
+      "description": "Set Setpoint 1 lower threshold",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_1_high": {
+      "read": false,
+      "write": true,
+      "description": "Set Setpoint 1 upper threshold",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_2_low": {
+      "read": false,
+      "write": true,
+      "description": "Set Setpoint 2 lower threshold",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_2_high": {
+      "read": false,
+      "write": true,
+      "description": "Set Setpoint 2 higher threshold",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_1_read": {
+      "read": true,
+      "write": false,
+      "description": "Read Setpoint 1 thresholds",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "setpoint_2_read": {
+      "read": true,
+      "write": false,
+      "description": "Read Setpoint 2 thresholds",
+      "risk": "safe",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "zero_adjust": {
+      "read": false,
+      "write": true,
+      "description": "Execute zero-offset adjustment",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "fs_adjust": {
+      "read": false,
+      "write": true,
+      "description": "Execute full-scale adjustment",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "clear_zero": {
+      "read": false,
+      "write": true,
+      "description": "Clear user zero adjustment",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "reset": {
+      "read": false,
+      "write": true,
+      "description": "Power-cycle reset",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    },
+    "factory_reset": {
+      "read": false,
+      "write": true,
+      "description": "Restore factory defaults",
+      "risk": "danger",
+      "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)"
+    }
+  },
+  "device_class": "gauge",
+  "experimental": false,
+  "source": "TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)",
+  "default_unit": "mbar",
+  "probe": "cdg",
+  "notes": {
+    "zero_adjust": "Zero-adjust preconditions are model specific; check this model's own operating manual before zeroing."
+  }
+}

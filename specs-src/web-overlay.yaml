@@ -1,0 +1,75 @@
+# Web-only fields merged over the CSC YAML at build time (scripts/specs-build.mjs).
+# The CSC files stay byte-for-byte syncable; everything the browser adds lives here:
+#   source        document every figure in the spec traces to
+#   default_unit  unit the device reports in until a unit read says otherwise (VGC adapter rule)
+#   risk          per-command safe / caution / danger, overriding the build defaults
+#   notes         shown in the danger confirmation (preconditions and the document they come from)
+#   probe         which scan probe identifies the model
+#
+# Build defaults: reads are safe; writes are caution; writes whose names match
+# reset|factory|zero|adjust|setpoint_N_low/high|degas|emission|baud|address|motor|vent|
+# pumping|heating|standby are danger.
+
+defaults:
+  default_unit: mbar
+  source: CSC device_specs (not yet checked against the manufacturer document)
+
+models:
+  CDG025D: &cdg
+    source: TIRA49E1 (commands); TINA49E1 (line settings, 🟠 V10)
+    probe: cdg
+    commands:
+      unit: { risk: caution }
+      data_tx_mode: { risk: caution }
+    notes:
+      zero_adjust: Zero-adjust preconditions are model specific; check this model's own operating manual before zeroing.
+  CDG045D:
+    <<: *cdg
+    source: TIRA49E1 (commands); TINA51E1 rev h (line settings 9600 8N1, no handshake)
+    notes:
+      zero_adjust: For the CDG045D, zeroing is locked at atmosphere and during warm-up (TINA51E1). Zero only at a pressure well below the lowest reading of interest, after warm-up.
+      fs_adjust: A full-scale adjustment needs a known reference pressure at full scale (TINA51E1).
+  CDG100D:
+    <<: *cdg
+    source: TIRA49E1 (commands); TINA52E1 (line settings, 🟠 V10)
+  CDG160D:
+    <<: *cdg
+    source: TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)
+  CDG200D:
+    <<: *cdg
+    source: TIRA49E1 (commands); TINA53E1 (line settings, 🟠 V10)
+  HPG400:
+    source: CSC sensor-code map only; pressure conversion 🟠 V12
+    probe: cdg
+  PCG550: &pxg
+    source: TQRA78E1 (OEM document for the PxG55x protocol, used as a proxy, 🟠 V1)
+    probe: pxg
+    commands:
+      data_unit: { risk: caution }
+      cdg_auto_zero: { risk: caution }
+      baud_rate: { risk: danger }
+      reset: { risk: danger }
+    notes:
+      baud_rate: A successful write drops the link. The tool closes the port, reopens it at the new rate and verifies identity; if that fails it reopens at the old rate.
+      _all: Do not operate the gauge through the serial interface and a fieldbus or the diagnostic port at the same time (S16 caution, 🟠 V1).
+  PSG550:
+    <<: *pxg
+  PSG500:
+    source: CSC device_specs (binary protocol corrections from PxG55x applied; 🟠 unverified)
+  PPG550: &ppg
+    source: CSC ppg_ascii.py and device_specs; factory line settings 🟠 V14
+    probe: ppg
+    commands:
+      unit: { risk: caution }
+  PPG570:
+    <<: *ppg
+  BCG450:
+    probe: pfeiffer_ascii
+  BCG552:
+    source: CSC device_specs; LogFixs32en26 decode 🟠 V11
+  OPG550:
+    source: CSC inficon_p3_v02.py and device_specs (🟠 V13)
+    probe: p3v02
+  TC600:
+    source: CSC tc600_protocol.py and device_specs
+    probe: pfeiffer_ascii

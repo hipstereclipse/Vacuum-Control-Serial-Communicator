@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.vinext/
+dist/
+out/
+*.log
+.DS_Store
+.edge-smoke*
+smoke.png
+public/build-info.json
