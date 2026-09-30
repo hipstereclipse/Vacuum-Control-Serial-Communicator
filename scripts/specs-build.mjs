@@ -78,6 +78,8 @@ function build({ file, raw, deviceClass }) {
     for (const key of Object.keys(cmd ?? {})) if (!COMMAND.has(key)) fail(file, `command "${name}": unknown field "${key}"`);
     if (typeof cmd.read !== "boolean" || typeof cmd.write !== "boolean") fail(file, `command "${name}": read and write must be booleans`);
     const override = extra.commands?.[name] ?? {};
+    // `exclude: true` in the overlay keeps a CSC command out of the browser tool entirely.
+    if (override.exclude) continue;
     const risk = override.risk ?? cmd.risk ?? (!cmd.write ? "safe" : DANGER.test(name) ? "danger" : "caution");
     if (!RISKS.has(risk)) fail(file, `command "${name}": risk "${risk}"`);
     if (["inficon_binary", "pfeiffer_binary", "pfeiffer_ascii", "inficon_ascii"].includes(raw.protocol) && cmd.pid == null) {

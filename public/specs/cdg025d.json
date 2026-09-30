@@ -114,20 +114,6 @@
       "risk": "danger",
       "source": "TIRA49E1 (commands); TINA49E1 (line settings, 🟠 V10)"
     },
-    "fs_adjust": {
-      "read": false,
-      "write": true,
-      "description": "Execute full-scale adjustment",
-      "risk": "danger",
-      "source": "TIRA49E1 (commands); TINA49E1 (line settings, 🟠 V10)"
-    },
-    "clear_zero": {
-      "read": false,
-      "write": true,
-      "description": "Clear user zero adjustment",
-      "risk": "danger",
-      "source": "TIRA49E1 (commands); TINA49E1 (line settings, 🟠 V10)"
-    },
     "reset": {
       "read": false,
       "write": true,

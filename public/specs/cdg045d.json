@@ -125,20 +125,6 @@
       "risk": "danger",
       "source": "TIRA49E1 (commands); TINA51E1 rev h (line settings 9600 8N1, no handshake)"
     },
-    "fs_adjust": {
-      "read": false,
-      "write": true,
-      "description": "Execute full-scale adjustment",
-      "risk": "danger",
-      "source": "TIRA49E1 (commands); TINA51E1 rev h (line settings 9600 8N1, no handshake)"
-    },
-    "clear_zero": {
-      "read": false,
-      "write": true,
-      "description": "Clear user zero adjustment",
-      "risk": "danger",
-      "source": "TIRA49E1 (commands); TINA51E1 rev h (line settings 9600 8N1, no handshake)"
-    },
     "reset": {
       "read": false,
       "write": true,
@@ -160,7 +146,6 @@
   "default_unit": "mbar",
   "probe": "cdg",
   "notes": {
-    "zero_adjust": "For the CDG045D, zeroing is locked at atmosphere and during warm-up (TINA51E1). Zero only at a pressure well below the lowest reading of interest, after warm-up.",
-    "fs_adjust": "A full-scale adjustment needs a known reference pressure at full scale (TINA51E1)."
+    "zero_adjust": "For the CDG045D, zeroing is locked at atmosphere and during warm-up (TINA51E1). Zero only at a pressure well below the lowest reading of interest, after warm-up."
   }
 }

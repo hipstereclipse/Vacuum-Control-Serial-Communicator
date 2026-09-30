@@ -5,6 +5,7 @@
 #   risk          per-command safe / caution / danger, overriding the build defaults
 #   notes         shown in the danger confirmation (preconditions and the document they come from)
 #   probe         which scan probe identifies the model
+#   exclude       per command: leave the command out of the browser tool (terminal, dictionary)
 #
 # Build defaults: reads are safe; writes are caution; writes whose names match
 # reset|factory|zero|adjust|setpoint_N_low/high|degas|emission|baud|address|motor|vent|
@@ -21,6 +22,9 @@ models:
     commands:
       unit: { risk: caution }
       data_tx_mode: { risk: caution }
+      # Full-scale adjustment and clearing the user zero are not offered from the browser.
+      fs_adjust: { exclude: true }
+      clear_zero: { exclude: true }
     notes:
       zero_adjust: Zero-adjust preconditions are model specific; check this model's own operating manual before zeroing.
   CDG045D:
@@ -28,7 +32,6 @@ models:
     source: TIRA49E1 (commands); TINA51E1 rev h (line settings 9600 8N1, no handshake)
     notes:
       zero_adjust: For the CDG045D, zeroing is locked at atmosphere and during warm-up (TINA51E1). Zero only at a pressure well below the lowest reading of interest, after warm-up.
-      fs_adjust: A full-scale adjustment needs a known reference pressure at full scale (TINA51E1).
   CDG100D:
     <<: *cdg
     source: TIRA49E1 (commands); TINA52E1 (line settings, 🟠 V10)

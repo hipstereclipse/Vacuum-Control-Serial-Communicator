@@ -121,6 +121,14 @@ test("value shapes come from options, ranges, units and descriptions", () => {
   assert.deepEqual(choicesFrom({ options: { 0: "OFF", 1: "ON" } }, "").map((c) => c.value), ["0", "1"]);
 });
 
+test("CDGs offer no full-scale adjustment or clear-zero command in the browser", () => {
+  for (const model of ["CDG025D", "CDG045D", "CDG100D", "CDG160D", "CDG200D"]) {
+    const names = commandsFromSpec(spec(model)).map((c) => c.name);
+    assert.ok(!names.includes("fs_adjust") && !names.includes("clear_zero"), model);
+    assert.ok(names.includes("zero_adjust"), model);
+  }
+});
+
 test("command groups for the quick-command bar", () => {
   assert.equal(commandGroup("serial_number"), "identity");
   assert.equal(commandGroup("software_version"), "identity");
