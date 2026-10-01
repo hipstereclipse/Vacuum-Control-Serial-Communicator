@@ -1091,16 +1091,32 @@ function buildDeviceList(list, groups, key) {
   const els = ordered.map((d) => {
     const sub = h("div.sub");
     const chip = h("span.chip.plain", { style: { fontSize: "11px" } });
-    const el = h("div.device-item", { role: "option", tabindex: "0", title: "Click to open · Ctrl-click, Shift-click or drag to select several" },
+    // The selection helper ignores presses on buttons, so this never changes the selection.
+    const remove = h("button.device-remove", { type: "button", title: `Remove ${d.label}`, "aria-label": `Remove ${d.label}`, onclick: (/** @type {MouseEvent} */ e) => {
+      e.stopPropagation();
+      void removeDevice(d);
+    } }, "×");
+    const el = h("div.device-item", { role: "option", tabindex: "0", title: "Click to open · Ctrl-click, Shift-click or drag to select several · Delete removes the selected" },
       h("span.swatch", { style: { background: d.color } }),
       h("span", null, h("div.name", null, d.label), sub),
-      chip);
+      chip,
+      remove);
     // A plain click opens the device; the mousedown before it has already made it the only
     // selected row. A drag ends its mouseup on another row, so it fires no click and only selects.
     el.addEventListener("click", (e) => {
       if (!e.ctrlKey && !e.metaKey && !e.shiftKey) openFromRail(d.id);
     });
+    // The selection helper cancels the press's default focus; focus the row so Delete works.
+    el.addEventListener("mousedown", (e) => {
+      if (!/** @type {HTMLElement} */ (e.target).closest("button")) el.focus({ preventScroll: true });
+    });
     el.addEventListener("keydown", (e) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        const chosen = [...state.railSelection].map((x) => state.devices.get(x)).filter(Boolean);
+        void removeDevices(chosen.length ? chosen : [d]);
+        return;
+      }
       if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
       openFromRail(d.id);
