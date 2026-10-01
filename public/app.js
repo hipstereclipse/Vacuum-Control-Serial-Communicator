@@ -10,6 +10,7 @@ import { CombinedTab } from "./ui/combined.js";
 import { SimulationTab, openSimulate, SIMULATABLE } from "./ui/simulate.js";
 import { openAddGauge, defaultCommands, fullScalePicker, fullScaleFromMbar } from "./ui/add-gauge.js";
 import { confirmSend, confirmBatch } from "./ui/confirm.js";
+import { bindRowSelection } from "./ui/multi-select.js";
 import { openSetpointEditor } from "./ui/setpoints.js";
 import { detectSetpoints } from "./core/setpoints.js";
 import { Registry } from "./core/registry/registry.js";
@@ -72,6 +73,8 @@ const state = {
   displayUnit: store.get("gauge-communicator-unit", "auto"),
   layout: { combined: "overlay", hidden: /** @type {string[]} */ ([]), colors: /** @type {Record<string, string>} */ ({}) },
   selectedTab: "welcome",
+  /** @type {Set<string>} device ids selected in the rail (the open tab's device, or several for bulk actions) */
+  railSelection: new Set(),
   dirty: false,
   structural: false,
   build: { version: "0.1.0", build: "dev" },
@@ -650,6 +653,21 @@ function onGap(g) {
 /** @param {any} d */
 async function removeDevice(d) {
   if (!confirm(`Remove ${d.label}? Its readings stay in exports made before removal only.`)) return;
+  await detachDevice(d);
+  render();
+}
+
+/** Remove several devices after one confirmation. @param {any[]} devices */
+async function removeDevices(devices) {
+  if (!devices.length) return;
+  if (devices.length === 1) return removeDevice(devices[0]);
+  if (!confirm(`Remove ${devices.length} devices (${devices.map((d) => d.label).join(", ")})? Their readings stay in exports made before removal only.`)) return;
+  for (const d of devices) await detachDevice(d);
+  render();
+}
+
+/** @param {any} d */
+async function detachDevice(d) {
   const record = [...state.ports.values()].find((r) => r.session === d.session);
   d.scheduler.removeDevice(d.id);
   d.simGauge?.remove?.();
@@ -663,9 +681,9 @@ async function removeDevice(d) {
   }
   panels.get(d.id)?.destroy();
   panels.delete(d.id);
+  state.railSelection.delete(d.id);
   if (state.selectedTab === d.id) state.selectedTab = state.devices.size ? [...state.devices.keys()][0] : "welcome";
   state.dirty = true;
-  render();
 }
 
 /** @param {any} d @param {string} name */
@@ -1027,10 +1045,20 @@ function renderBanner() {
   replace(region, ...banners);
 }
 
+/**
+ * The rail's rows, kept between renders and updated in place: rebuilding them on every reading
+ * reset the hover state (flicker) and swallowed clicks whose mouseup landed on a new element.
+ * @type {{ key: string, rows: Map<string, { el: HTMLElement, sub: HTMLElement, chip: HTMLElement }>, items: { id: string, selected: boolean }[], sync: () => void }}
+ */
+let rail = { key: "", rows: new Map(), items: [], sync: () => {} };
+
 function renderDeviceList() {
   const list = $("#deviceList");
+  for (const id of state.railSelection) if (!state.devices.has(id)) state.railSelection.delete(id);
   if (!state.devices.size) {
-    replace(list, h("p.empty", null, "No devices yet. Add a gauge, or try the demo."));
+    if (rail.key !== "empty") replace(list, h("p.empty", null, "No devices yet. Add a gauge, or try the demo."));
+    rail = { key: "empty", rows: new Map(), items: [], sync: () => {} };
+    renderRailBulk();
     return;
   }
   /** @type {Map<string, any[]>} */
@@ -1040,12 +1068,85 @@ function renderDeviceList() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)?.push(d);
   }
-  replace(list, ...[...groups.entries()].map(([port, devices]) => h("div.port-group", null,
-    h("div.port-group-title", null, port),
-    ...devices.map((d) => h("button.device-item", { type: "button", "aria-selected": String(state.selectedTab === d.id), onclick: () => selectTab(d.id) },
+  const key = [...groups].map(([port, devices]) => `${port}:${devices.map((d) => `${d.id}=${d.label}=${d.color}`).join(",")}`).join("|");
+  if (key !== rail.key) buildDeviceList(list, groups, key);
+  for (const d of state.devices.values()) {
+    const row = rail.rows.get(d.id);
+    if (!row) continue;
+    const sub = d.last ? d.last.formatted ?? "" : d.status.state;
+    if (row.sub.textContent !== sub) row.sub.textContent = sub;
+    if (row.chip.textContent !== d.status.state) row.chip.textContent = d.status.state;
+    row.el.setAttribute("aria-current", String(state.selectedTab === d.id));
+  }
+  for (const it of rail.items) it.selected = state.railSelection.has(it.id);
+  rail.sync();
+  renderRailBulk();
+}
+
+/** @param {HTMLElement} list @param {Map<string, any[]>} groups @param {string} key */
+function buildDeviceList(list, groups, key) {
+  const rows = new Map();
+  const ordered = [...groups.values()].flat();
+  const items = ordered.map((d) => ({ id: d.id, selected: state.railSelection.has(d.id) }));
+  const els = ordered.map((d) => {
+    const sub = h("div.sub");
+    const chip = h("span.chip.plain", { style: { fontSize: "11px" } });
+    const el = h("div.device-item", { role: "option", tabindex: "0", title: "Click to open · Ctrl-click, Shift-click or drag to select several" },
       h("span.swatch", { style: { background: d.color } }),
-      h("span", null, h("div.name", null, d.label), h("div.sub", null, d.last ? d.last.formatted ?? "" : d.status.state)),
-      h("span.chip.plain", { style: { fontSize: "11px" } }, d.status.state))))));
+      h("span", null, h("div.name", null, d.label), sub),
+      chip);
+    // A plain click opens the device; the mousedown before it has already made it the only
+    // selected row. A drag ends its mouseup on another row, so it fires no click and only selects.
+    el.addEventListener("click", (e) => {
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) openFromRail(d.id);
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openFromRail(d.id);
+    });
+    rows.set(d.id, { el, sub, chip });
+    return el;
+  });
+  let i = 0;
+  replace(list, h("div.device-groups", { role: "listbox", "aria-label": "Devices", "aria-multiselectable": "true" },
+    ...[...groups.entries()].map(([port, devices]) => h("div.port-group", { role: "group", "aria-label": port },
+      h("div.port-group-title", null, port),
+      ...devices.map(() => els[i++])))));
+  const { sync } = bindRowSelection(els.map((row) => ({ row })), items, () => {
+    state.railSelection = new Set(items.filter((x) => x.selected).map((x) => x.id));
+    renderRailBulk();
+  });
+  rail = { key, rows, items, sync };
+}
+
+/** Open a device from the rail, keeping the rail's selection as it is. @param {string} id */
+function openFromRail(id) {
+  if (!state.railSelection.size) state.railSelection.add(id);
+  state.selectedTab = id;
+  render();
+}
+
+/** Bulk actions under the rail while more than one device is selected. */
+function renderRailBulk() {
+  const host = $("#railBulk");
+  if (!host) return;
+  const chosen = [...state.railSelection].map((id) => state.devices.get(id)).filter(Boolean);
+  const key = chosen.length > 1 ? chosen.map((d) => d.id).join(",") : "";
+  if (host.dataset.key === key) return;
+  host.dataset.key = key;
+  host.hidden = !key;
+  if (!key) return replace(host);
+  replace(host,
+    h("div.rail-bulk-title", null, `${chosen.length} selected`, h("div.grow"),
+      h("button.button.tiny.ghost", { type: "button", onclick: () => {
+        state.railSelection = state.devices.has(state.selectedTab) ? new Set([state.selectedTab]) : new Set();
+        renderDeviceList();
+      } }, "Clear")),
+    h("div.rail-bulk-actions", null,
+      h("button.button.small", { type: "button", onclick: () => chosen.forEach((d) => setPolling(d, false)) }, "Pause"),
+      h("button.button.small", { type: "button", onclick: () => chosen.forEach((d) => setPolling(d, true)) }, "Resume"),
+      h("button.button.small", { type: "button", onclick: () => void removeDevices(chosen) }, "Remove")));
 }
 
 function renderTabs() {
@@ -1061,6 +1162,7 @@ function renderTabs() {
 /** @param {string} id */
 function selectTab(id) {
   state.selectedTab = id;
+  if (state.devices.has(id)) state.railSelection = new Set([id]);
   render();
 }
 

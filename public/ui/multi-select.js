@@ -3,7 +3,8 @@
  * Row multi-selection for tables, matching CSC's extended selection: a click selects one row,
  * Ctrl/Cmd-click toggles a row, Shift-click selects the range from the last clicked row, and
  * dragging with the button held selects the range under the pointer. A row's checkbox toggles
- * only that row. Used by the Add Gauge results and the Simulate dialog's model list.
+ * only that row. Used by the Add Gauge results, the Simulate dialog's model list and the
+ * device rail.
  */
 
 /**

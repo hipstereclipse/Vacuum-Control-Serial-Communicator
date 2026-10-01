@@ -143,6 +143,7 @@ export default function Page() {
           <aside className="rail" aria-label="Devices">
             <h2>Devices</h2>
             <div id="deviceList" />
+            <div className="rail-bulk" id="railBulk" hidden />
             <div className="rail-actions">
               <button className="button primary" id="addGaugeButton" type="button">
                 <Icon name="plus" /> Add gauge
