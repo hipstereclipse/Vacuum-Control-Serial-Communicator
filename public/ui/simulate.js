@@ -5,7 +5,9 @@
  * gas type, humidity, leak rate, base pressure) plus pause, restart and speed.
  */
 import { h, replace, openDialog, closeDialog, toast } from "./dom.js";
-import { fullScalePicker, FS_TORR } from "./add-gauge.js";
+import { FS_TORR, FS_MBAR } from "./add-gauge.js";
+import { bindRowSelection } from "./multi-select.js";
+import { FAMILY_LABELS } from "../core/registry/registry.js";
 import { formatPressure } from "../core/codecs/common.js";
 
 /** Models the protocol emulators can answer for. */
@@ -13,34 +15,63 @@ export const SIMULATABLE = ["CDG025D", "CDG045D", "CDG100D", "CDG160D", "CDG200D
 const GASES = ["N2", "AR", "HE", "CO2"];
 const HUMIDITY = ["LOW", "MEDIUM", "HIGH"];
 
-/** @param {any} app */
+/**
+ * Add one or more simulated gauges. Models are picked from a list with the same multi-select
+ * as the Add Gauge results (click, Ctrl-click, Shift-click, drag, or the checkboxes); every
+ * selected CDG gets the chosen full scale.
+ * @param {any} app
+ */
 export function openSimulate(app) {
-  const c = { model: "CDG045D", fullScale: FS_TORR.find((o) => o.value === 10) ?? null, fullScaleConfirmed: true };
-  const body = h("div");
-  const render = () => {
-    const model = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Model" }, SIMULATABLE.filter((m) => app.registry.has(m)).map((m) => h("option", { value: m }, m))));
-    model.value = c.model;
-    model.onchange = () => {
-      c.model = model.value;
-      render();
-    };
-    const isCdg = c.model.startsWith("CDG");
-    replace(body,
-      h("label.field", null, h("span.field-label", null, "Gauge model"), model),
-      isCdg ? fullScalePicker(c, render) : null,
-      h("p.hint", null, "The simulated gauge runs the real codec, framer and scheduler against a protocol emulator, so everything you see — terminal bytes included — is what the real gauge would exchange. A CDG reading is gas-type independent; Pirani readings are not."));
+  const items = SIMULATABLE.filter((m) => app.registry.has(m)).map((model) => ({ model, selected: model === "CDG045D" }));
+  const fsOptions = [...FS_TORR, ...FS_MBAR];
+  let fs = FS_TORR.find((o) => o.value === 10) ?? fsOptions[0];
+  const fsSelect = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "CDG full scale" },
+    fsOptions.map((o, i) => h("option", { value: String(i) }, `${o.value} ${o.unit} (${o.mbar} mbar)`))));
+  fsSelect.value = String(fsOptions.indexOf(fs));
+  fsSelect.onchange = () => (fs = fsOptions[Number(fsSelect.value)]);
+  const fsField = h("label.field", null, h("span.field-label", null, "Full scale for the simulated CDGs"), fsSelect);
+  const add = /** @type {HTMLButtonElement} */ (h("button.button.primary", { type: "button" }));
+
+  const rows = items.map((it) => {
+    const spec = app.registry.get(it.model);
+    const box = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: it.selected, "aria-label": `Select ${it.model}` }));
+    const row = h("tr", null, h("td", null, box), h("td", null, h("strong", null, it.model)), h("td.hint", null, FAMILY_LABELS[/** @type {keyof typeof FAMILY_LABELS} */ (spec.protocol)] ?? spec.protocol), h("td", null, spec.experimental ? h("span.chip.warn", null, "experimental") : null));
+    return { row, box };
+  });
+  const refresh = () => {
+    const chosen = items.filter((x) => x.selected);
+    fsField.hidden = !chosen.some((x) => x.model.startsWith("CDG"));
+    add.disabled = !chosen.length;
+    add.textContent = chosen.length > 1 ? `Add ${chosen.length} simulated gauges` : "Add simulated gauge";
   };
-  render();
-  const add = h("button.button.primary", { type: "button", onclick: async () => {
-    if (c.model.startsWith("CDG") && !c.fullScale) return toast("Choose a full scale.", "warn");
-    try {
-      await app.addSimulatedDevice({ model: c.model, fullScale: c.fullScale ? { ...c.fullScale, origin: "user" } : null });
-      closeDialog("simulateDialog");
-    } catch (error) {
-      toast(/** @type {Error} */ (error).message, "bad");
+  bindRowSelection(rows, items, refresh);
+  refresh();
+
+  add.onclick = async () => {
+    const chosen = items.filter((x) => x.selected);
+    add.disabled = true;
+    let failed = 0;
+    for (const it of chosen) {
+      try {
+        await app.addSimulatedDevice({ model: it.model, fullScale: it.model.startsWith("CDG") ? { ...fs, origin: "user" } : null });
+      } catch (error) {
+        failed += 1;
+        toast(`${it.model}: ${/** @type {Error} */ (error).message}`, "bad");
+      }
     }
-  } }, "Add simulated gauge");
-  openDialog("simulateDialog", { body: [body], actions: [h("button.button", { type: "button", onclick: () => closeDialog("simulateDialog") }, "Cancel"), add] });
+    if (chosen.length > 1 && !failed) toast(`${chosen.length} simulated gauges added.`);
+    if (!failed) closeDialog("simulateDialog");
+    else refresh();
+  };
+  openDialog("simulateDialog", {
+    body: [
+      h("div.scroll.sim-models", null, h("table.data", null, h("thead", null, h("tr", null, h("th", null, ""), h("th", null, "Model"), h("th", null, "Protocol"), h("th", null, ""))), h("tbody", null, rows.map((r) => r.row)))),
+      h("p.hint", null, "Click a model to select it, Ctrl-click to add or remove one, Shift-click or drag to select a range."),
+      fsField,
+      h("p.hint", null, "Each simulated gauge runs the real codec, framer and scheduler against a protocol emulator, so everything you see, terminal bytes included, is what the real gauge would exchange. A CDG reading is gas-type independent; Pirani readings are not.")
+    ],
+    actions: [h("button.button", { type: "button", onclick: () => closeDialog("simulateDialog") }, "Cancel"), add]
+  });
 }
 
 /**

@@ -79,6 +79,7 @@ export function confirmSend(request) {
  *   source?: string,
  *   risk?: "caution" | "danger",
  *   warning?: string,
+ *   confirmLabel?: string,   the final button text when the batch arms a mode rather than sending now
  * }} request
  * @returns {Promise<boolean>}
  */
@@ -98,7 +99,7 @@ export function confirmBatch(request) {
     sendButton.onclick = () => {
       if (!armed) {
         armed = true;
-        sendButton.textContent = `Send ${count} now`;
+        sendButton.textContent = request.confirmLabel ?? `Send ${count} now`;
         sendButton.focus();
         return;
       }

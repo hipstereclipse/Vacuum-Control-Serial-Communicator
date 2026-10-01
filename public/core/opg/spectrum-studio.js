@@ -18,13 +18,19 @@
  * Peer pressures are not copied here: in the browser every device's Series already holds its
  * full history on a shared wall-clock axis, so the studio reads them directly.
  *
- * Differences from CSC, all following WEB_PORT_PLAN.md section 11 ("no automatic writes"):
- *  - CSC switches the plasma on or off by itself when "auto plasma" is on. Here the same
- *    thresholds and the same 5 s cooldown raise a prompt, and the write needs the user's click
- *    and the usual confirmation.
- *  - CSC enables the SPEC / RoR / RGD algorithm whenever the main plot changes and re-sends the
- *    enable every 30 s. Here starting an algorithm is an explicit, confirmed action; the
- *    background acquisition only reads (state, record count, record).
+ * Auto plasma has three modes (plasma.mode). All use CSC's thresholds and 5 s cooldown:
+ *  - "off": no evaluation.
+ *  - "prompt" (the default when enabled): a threshold crossing raises a prompt; the write needs
+ *    the user's click and the usual confirmation (WEB_PORT_PLAN.md section 11).
+ *  - "auto": CSC's behaviour. A crossing queues an action (takeAutoAction) that the app sends
+ *    without asking: plasma off above the max safe pressure, on below the min ignition
+ *    pressure, and after an automatic ignition optionally the main plot's algorithm, as CSC's
+ *    plasma_enable handler does. The mode has to be armed through a danger confirmation and is
+ *    never restored as "auto" after a reload.
+ *
+ * CSC also enables the SPEC / RoR / RGD algorithm whenever the main plot changes and re-sends
+ * the enable every 30 s. Here starting an algorithm is an explicit, confirmed action (or part
+ * of armed auto plasma); the background acquisition only reads (state, record count, record).
  *
  * Other differences: the gas shares from an RGD record's own partial pressures hold until the
  * next spectrum (CSC lets the next pressure reading replace them with the optical fit), and a
@@ -114,7 +120,11 @@ export const AUTO_PLASMA_COOLDOWN_MS = 5000;
 export const SPIKE_WINDOW = 5;
 export const SPIKE_FACTOR = 100;
 /** Plasma threshold defaults, CSC GUI/settings_dialog.py DEFAULTS ("opg/..."). */
-export const PLASMA_DEFAULTS = Object.freeze({ autoEnabled: false, minIgnitionMbar: 1.0e-6, maxSafeMbar: 1.0e-2 });
+export const PLASMA_DEFAULTS = Object.freeze({ mode: /** @type {"off" | "prompt" | "auto"} */ ("off"), minIgnitionMbar: 1.0e-6, maxSafeMbar: 1.0e-2, autoStartAlgorithm: true });
+/** Auto plasma modes, in the order the studio offers them. */
+export const PLASMA_MODES = Object.freeze(["off", "prompt", "auto"]);
+/** Plasma state reads while auto plasma is on, so the thresholds meet a current state. */
+export const PLASMA_READ_INTERVAL_MS = 2000;
 
 /** @type {Readonly<Record<string, string>>} */
 export const SPECTRUM_MODE_DESCRIPTIONS = Object.freeze({
@@ -172,11 +182,14 @@ export function formatG(v, p = 4) {
 export function deltaSummary(a, b, unit) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   const pct = pressureDeltaPercent(a, b);
+  // CSC divides by max(B, 1e-30), which prints ratios like 1e+24 when B reads zero; a
+  // non-positive reference gives "n/a" here, as Δ% does.
+  const ratio = b > 0 ? a / b : null;
   return {
     delta: a - b,
     percent: pct,
-    ratio: a / Math.max(b, 1e-30),
-    text: `Δ = ${formatSci(a - b, 4, true)} ${unit}  |  Δ% = ${pct == null ? "n/a" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`}  |  ratio = ${formatG(a / Math.max(b, 1e-30), 4)}`
+    ratio,
+    text: `Δ = ${formatSci(a - b, 4, true)} ${unit}  |  Δ% = ${pct == null ? "n/a" : `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`}  |  ratio = ${ratio == null ? "n/a" : formatG(ratio, 4)}`
   };
 }
 
@@ -416,12 +429,20 @@ export class OpgStudioState {
       /** @type {number | null} 0 off, 1 on but not ignited, 2 ignited */
       state: /** @type {number | null} */ (null),
       text: "—",
-      autoEnabled: plasma.autoEnabled,
+      /** @type {"off" | "prompt" | "auto"} "auto" only after the user armed it in this page */
+      mode: plasma.mode === "auto" ? "prompt" : PLASMA_MODES.includes(plasma.mode) ? plasma.mode : "off",
       minMbar: plasma.minIgnitionMbar,
       maxMbar: plasma.maxSafeMbar,
+      /** after an automatic ignition, also start the main plot's algorithm (CSC) */
+      autoStartAlgorithm: plasma.autoStartAlgorithm !== false,
       lastActionMs: -Infinity,
+      lastReadMs: -Infinity,
       /** @type {{ action: "on" | "off", reason: string, pressureMbar: number, t: number } | null} */
-      prompt: null
+      prompt: null,
+      /** @type {{ action: "on" | "off", reason: string, pressureMbar: number, t: number } | null} queued for the app in "auto" mode */
+      pending: null,
+      /** @type {{ action: "on" | "off", reason: string, pressureMbar: number, t: number, result: string } | null} */
+      lastAuto: null
     };
 
     /** @type {Record<string, number | null>} */
@@ -487,15 +508,57 @@ export class OpgStudioState {
     return RECORD_FOR_MODE[this.analysisMode] ?? "spec_record";
   }
 
-  /** @param {{ minMbar?: number, maxMbar?: number, autoEnabled?: boolean }} patch */
+  /**
+   * Thresholds (mbar) and the auto plasma mode. Arming "auto" is the caller's job: the studio
+   * asks for a danger confirmation first.
+   * @param {{ minMbar?: number, maxMbar?: number, mode?: "off" | "prompt" | "auto", autoStartAlgorithm?: boolean }} patch
+   */
   setPlasmaSettings(patch) {
     if (patch.minMbar != null && Number.isFinite(patch.minMbar) && patch.minMbar > 0) this.plasma.minMbar = patch.minMbar;
     if (patch.maxMbar != null && Number.isFinite(patch.maxMbar) && patch.maxMbar > 0) this.plasma.maxMbar = patch.maxMbar;
-    if (patch.autoEnabled != null) {
-      this.plasma.autoEnabled = patch.autoEnabled;
-      if (!patch.autoEnabled) this.plasma.prompt = null;
+    if (patch.autoStartAlgorithm != null) this.plasma.autoStartAlgorithm = patch.autoStartAlgorithm;
+    if (patch.mode != null && PLASMA_MODES.includes(patch.mode) && patch.mode !== this.plasma.mode) {
+      this.plasma.mode = patch.mode;
+      this.plasma.prompt = null;
+      this.plasma.pending = null;
+      // A freshly armed mode acts on the current pressure at once, as CSC's toggle does.
+      this.plasma.lastActionMs = -Infinity;
     }
     this.evaluatePlasma();
+    this.touch();
+  }
+
+  /** Whether thresholds are evaluated (prompt or auto). */
+  get plasmaWatched() {
+    return this.plasma.mode !== "off";
+  }
+
+  /** Should the app read the plasma state now? Marks the read when it says yes. @param {number} [nowMs] */
+  plasmaReadDue(nowMs = this.now()) {
+    if (!this.plasmaWatched || nowMs - this.plasma.lastReadMs < PLASMA_READ_INTERVAL_MS) return false;
+    this.plasma.lastReadMs = nowMs;
+    return true;
+  }
+
+  /** In "auto" mode: the queued plasma action, once. @returns {{ action: "on" | "off", reason: string, pressureMbar: number, t: number } | null} */
+  takeAutoAction() {
+    const a = this.plasma.pending;
+    this.plasma.pending = null;
+    return this.plasma.mode === "auto" ? a : null;
+  }
+
+  /**
+   * Record what an automatic action did (CSC puts the same text in the mode status line).
+   * @param {{ action: "on" | "off", reason: string, pressureMbar: number, t: number }} action @param {string} result @param {string} unit
+   */
+  noteAutoAction(action, result, unit) {
+    this.plasma.lastAuto = { ...action, result };
+    const limit = action.action === "off" ? this.plasma.maxMbar : this.plasma.minMbar;
+    const u = isPressureUnit(unit) ? unit : "mbar";
+    const fmt = (/** @type {number} */ mbar) => `${formatSci(convertPressure(mbar, "mbar", u), 2)} ${u}`;
+    this.modeStatus = action.action === "off"
+      ? `Auto-plasma: pressure ${fmt(action.pressureMbar)} > max safe ${fmt(limit)}: switching plasma OFF (${result}).`
+      : `Auto-plasma: pressure ${fmt(action.pressureMbar)} < min ignite ${fmt(limit)}: switching plasma ON (${result}).`;
     this.touch();
   }
 
@@ -739,15 +802,26 @@ export class OpgStudioState {
   }
 
   /**
-   * Re-evaluate the plasma thresholds (in mbar) against the latest pressure and raise or clear
-   * the prompt. Never writes anything.
+   * Re-evaluate the plasma thresholds (in mbar) against the latest pressure (CSC
+   * `_evaluate_auto_plasma`). In "prompt" mode this raises or clears the prompt; in "auto" mode
+   * it queues the action for the app (takeAutoAction). Never writes anything itself.
    */
   evaluatePlasma() {
     const nowMs = this.now();
     const p = this.plasma;
-    if (!p.autoEnabled) {
+    if (p.mode === "off") {
       p.prompt = null;
+      p.pending = null;
       return null;
+    }
+    if (p.mode === "auto") {
+      p.prompt = null;
+      if (p.pending) return p.pending;
+      const verdict = evaluateAutoPlasma({ enabled: true, pressureMbar: this.lastPressureMbar, plasmaState: p.state, minMbar: p.minMbar, maxMbar: p.maxMbar, lastActionMs: p.lastActionMs, nowMs });
+      if (!verdict || this.lastPressureMbar == null) return null;
+      p.lastActionMs = nowMs;
+      p.pending = { ...verdict, pressureMbar: this.lastPressureMbar, t: nowMs };
+      return p.pending;
     }
     if (p.prompt) {
       // Drop a prompt whose condition no longer holds.

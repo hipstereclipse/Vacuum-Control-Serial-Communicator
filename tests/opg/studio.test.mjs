@@ -47,7 +47,8 @@ test("delta line includes the pressure and percent delta (CSC)", () => {
   assert.ok(d.text.includes("Δ% = +25.00%"), d.text);
   assert.ok(d.text.includes("ratio = 1.25"), d.text);
   assert.equal(deltaSummary(NaN, 1, "mbar"), null);
-  assert.ok(deltaSummary(1e-6, 0, "Torr").text.includes("Δ% = n/a"));
+  const zero = deltaSummary(1e-6, 0, "Torr");
+  assert.ok(zero.text.includes("Δ% = n/a") && zero.text.includes("ratio = n/a"), zero.text);
 });
 
 test("formatSci matches Python's {:.3E}", () => {
@@ -70,7 +71,7 @@ test("ignition thresholds follow the display unit but are stored in mbar (CSC)",
 });
 
 test("defaults match CSC's settings dialog", () => {
-  assert.deepEqual({ ...PLASMA_DEFAULTS }, { autoEnabled: false, minIgnitionMbar: 1e-6, maxSafeMbar: 1e-2 });
+  assert.deepEqual({ ...PLASMA_DEFAULTS }, { mode: "off", minIgnitionMbar: 1e-6, maxSafeMbar: 1e-2, autoStartAlgorithm: true });
 });
 
 test("pressure and peer histories are not sample-capped (CSC)", () => {
@@ -243,7 +244,7 @@ test("the studio raises a plasma prompt instead of writing, and clears it when t
   s.ingestReply("plasma_state", { success: true, value: 2 });
   s.ingestPressure(1e-4, "mbar");
   assert.equal(s.plasma.prompt, null); // auto plasma off
-  s.setPlasmaSettings({ autoEnabled: true });
+  s.setPlasmaSettings({ mode: "prompt" });
   advance(100);
   for (const p of [3e-2, 3.1e-2, 3.2e-2]) s.ingestPressure(p, "mbar");
   assert.equal(s.plasma.prompt?.action, "off");
@@ -257,6 +258,47 @@ test("the studio raises a plasma prompt instead of writing, and clears it when t
   assert.equal(s.plasma.prompt?.action, "off");
   for (const p of [1e-3, 1e-3, 1e-3, 1e-3]) s.ingestPressure(p, "mbar");
   assert.equal(s.plasma.prompt, null);
+});
+
+test("auto mode queues CSC's actions once per cooldown and never shows a prompt", () => {
+  const { s, advance } = studio();
+  s.ingestReply("plasma_state", { success: true, value: 2 });
+  s.setPlasmaSettings({ mode: "auto" });
+  for (const p of [3e-2, 3.1e-2, 3.2e-2]) s.ingestPressure(p, "mbar");
+  assert.equal(s.plasma.prompt, null);
+  const a = s.takeAutoAction();
+  assert.equal(a?.action, "off");
+  assert.equal(s.takeAutoAction(), null); // taken once
+  s.ingestReply("plasma_state", { success: true, value: 0 });
+  s.ingestPressure(3.3e-2, "mbar");
+  assert.equal(s.takeAutoAction(), null); // off and above min ignite: nothing to do
+  s.noteAutoAction(a, "sent", "Torr");
+  assert.match(s.modeStatus, /^Auto-plasma: pressure 2\.25E-02 Torr > max safe 7\.50E-03 Torr: switching plasma OFF \(sent\)\.$/);
+  advance(1000);
+  for (const p of [5e-7, 5e-7, 5e-7]) s.ingestPressure(p, "mbar");
+  assert.equal(s.takeAutoAction(), null); // still inside the 5 s cooldown
+  advance(5000);
+  s.ingestPressure(5e-7, "mbar");
+  assert.equal(s.takeAutoAction()?.action, "on");
+  // Leaving auto mode drops anything queued.
+  advance(6000);
+  s.ingestPressure(5e-7, "mbar");
+  assert.equal(s.plasma.pending?.action, "on");
+  s.setPlasmaSettings({ mode: "prompt" });
+  assert.equal(s.takeAutoAction(), null);
+});
+
+test("auto mode is never restored from saved settings, and plasma reads follow the mode", () => {
+  const { s, advance } = studio({ plasma: { mode: "auto" } });
+  assert.equal(s.plasma.mode, "prompt");
+  assert.ok(s.plasmaReadDue());
+  assert.ok(!s.plasmaReadDue());
+  advance(2000);
+  assert.ok(s.plasmaReadDue());
+  s.setPlasmaSettings({ mode: "off" });
+  advance(5000);
+  assert.ok(!s.plasmaReadDue());
+  assert.equal(new OpgStudioState({ plasma: { mode: "nonsense" } }).plasma.mode, "off");
 });
 
 test("acquisition runs for Live Data only, at most every 2 s", () => {

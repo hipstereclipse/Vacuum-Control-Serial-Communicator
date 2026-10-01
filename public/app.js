@@ -29,7 +29,7 @@ import { createPpgEmulator } from "./core/sim/emulators/ppg.js";
 import { createPfeifferAsciiEmulator } from "./core/sim/emulators/pfeiffer-ascii.js";
 import { createP3V02Emulator } from "./core/sim/emulators/p3v02.js";
 import { createTc600Codec } from "./core/turbo/tc600.js";
-import { OpgStudioState, PLASMA_DEFAULTS, RECORD_COMMANDS, COUNT_FOR_RECORD, STATE_FOR_RECORD } from "./core/opg/spectrum-studio.js";
+import { OpgStudioState, PLASMA_DEFAULTS, RECORD_COMMANDS, COUNT_FOR_RECORD, ENABLE_FOR_RECORD, STATE_FOR_RECORD } from "./core/opg/spectrum-studio.js";
 import { SpectrumMode } from "./core/sim/opg-spectrum.js";
 
 const TRAFFIC_CAP = 100000;
@@ -454,18 +454,22 @@ function spectrumModeFor(s) {
   return SpectrumMode.AUTO;
 }
 
+/** Saved plasma settings. A saved "auto" comes back as "prompt": automatic switching is re-armed by hand after every reload. */
 function loadPlasmaSettings() {
   const v = store.get(PLASMA_SETTINGS_KEY, {});
+  const mode = v.mode ?? (v.autoEnabled ? "prompt" : PLASMA_DEFAULTS.mode);
   return {
-    autoEnabled: typeof v.autoEnabled === "boolean" ? v.autoEnabled : PLASMA_DEFAULTS.autoEnabled,
+    mode: mode === "auto" ? "prompt" : mode,
     minIgnitionMbar: v.minIgnitionMbar > 0 ? v.minIgnitionMbar : PLASMA_DEFAULTS.minIgnitionMbar,
-    maxSafeMbar: v.maxSafeMbar > 0 ? v.maxSafeMbar : PLASMA_DEFAULTS.maxSafeMbar
+    maxSafeMbar: v.maxSafeMbar > 0 ? v.maxSafeMbar : PLASMA_DEFAULTS.maxSafeMbar,
+    autoStartAlgorithm: typeof v.autoStartAlgorithm === "boolean" ? v.autoStartAlgorithm : PLASMA_DEFAULTS.autoStartAlgorithm
   };
 }
 
 /** Plasma thresholds persist per browser, in mbar (CSC keeps them in QSettings "opg/..."). @param {OpgStudioState} s */
 function savePlasmaSettings(s) {
-  store.set(PLASMA_SETTINGS_KEY, { autoEnabled: s.plasma.autoEnabled, minIgnitionMbar: s.plasma.minMbar, maxSafeMbar: s.plasma.maxMbar });
+  store.set(PLASMA_SETTINGS_KEY, { mode: s.plasma.mode, minIgnitionMbar: s.plasma.minMbar, maxSafeMbar: s.plasma.maxMbar, autoStartAlgorithm: s.plasma.autoStartAlgorithm });
+  renderBanner();
 }
 
 /** @param {any} o */
@@ -813,25 +817,78 @@ async function writeBatch(d, items, meta) {
 }
 
 /**
- * Spectrum Studio's background acquisition (CSC `_live_spec_timer`, every 2 s): for the record
- * behind the main plot, read the algorithm state and the record count, and the latest record
- * when the gauge has captured one. Reads only; it never enables an algorithm (CSC re-sends the
- * enable every 30 s, which would be an automatic write). With the plasma prompt on, it also
- * reads the plasma state so the thresholds are evaluated against a current state.
+ * Spectrum Studio's background work, per OPG550, every 500 ms:
+ *  - Auto plasma: while it is on (prompt or auto), read the plasma state every 2 s so the
+ *    thresholds meet a current state; in armed auto mode, send the queued plasma action
+ *    (autoPlasma below).
+ *  - Acquisition (CSC `_live_spec_timer`, every 2 s): for the record behind the main plot, read
+ *    the algorithm state and record count, and the latest record when one exists. Reads only;
+ *    it never re-sends an algorithm enable (CSC does so every 30 s).
  */
 function opgTick() {
   for (const d of state.devices.values()) {
     const s = d.opg;
-    if (!s || d.opgBusy || d.opgAcquire === false) continue;
+    if (!s || d.opgBusy) continue;
     const session = d.scheduler?.devices.get(d.id);
     if (!session?.polling || ["dead", "offline"].includes(d.status.state)) continue;
-    if (!s.acquisitionDue()) continue;
+    const action = s.takeAutoAction();
+    const plasmaRead = s.plasmaReadDue() && Boolean(d.spec.commands?.plasma_state);
+    const acquire = d.opgAcquire !== false && s.acquisitionDue();
+    if (!action && !plasmaRead && !acquire) continue;
     d.opgBusy = true;
-    acquireOpg(d).finally(() => {
+    (async () => {
+      if (action) await autoPlasma(d, action);
+      if (plasmaRead) await query(d, "plasma_state", { autoPoll: true }).catch(() => null);
+      if (acquire) await acquireOpg(d);
+    })().finally(() => {
       d.opgBusy = false;
       queueRender();
     });
   }
+}
+
+/**
+ * Armed auto plasma (CSC `_evaluate_auto_plasma` and its plasma_enable reply handler): write
+ * plasma_enable without asking, read the state back, and after an ignition, when enabled,
+ * switch every algorithm off and start the main plot's algorithm. Every write is logged with
+ * its exact bytes and marked automatic, like a confirmed one.
+ * @param {any} d @param {{ action: "on" | "off", reason: string, pressureMbar: number, t: number }} action
+ */
+async function autoPlasma(d, action) {
+  const s = d.opg;
+  const unit = isPressureUnitDisplay();
+  /** @param {string} command @param {any} value */
+  const write = async (command, value) => {
+    const bytes = d.codec.buildRequest(command, value);
+    const record = { t: new Date().toISOString(), device: d.label, command, value, bytes: toHex(bytes), confirmed: false, automatic: true, reason: `auto plasma: ${action.reason}`, response: "" };
+    state.writes.push(record);
+    const entry = await d.scheduler.terminal(d.id, bytes, { command, isWrite: true });
+    record.response = entry.error ?? entry.formatted ?? toHex(entry.response);
+    return entry;
+  };
+  const value = action.action === "on" ? 1 : 0;
+  const entry = await write("plasma_enable", value);
+  const result = entry.error ? `failed: ${entry.error}` : "sent";
+  s.noteAutoAction(action, result, unit);
+  pushLog(d, { t: Date.now(), kind: entry.error ? "err" : "note", text: s.modeStatus });
+  toast(`${d.label}: ${s.modeStatus}`, entry.error ? "bad" : "warn", 8000);
+  state.dirty = true;
+  if (entry.error) return;
+  await query(d, "plasma_state").catch(() => null);
+  if (value === 1 && s.plasma.autoStartAlgorithm) {
+    const enable = ENABLE_FOR_RECORD[s.activeRecordCommand()];
+    if (d.spec.commands?.all_algorithms_off) await write("all_algorithms_off", 0);
+    if (d.spec.commands?.[enable]) {
+      const started = await write(enable, 1);
+      if (!started.error) s.noteAlgorithmStarted(enable);
+      pushLog(d, { t: Date.now(), kind: started.error ? "err" : "note", text: `Auto plasma: ${enable} ${started.error ? `failed (${started.error})` : "sent"} after ignition.` });
+    }
+  }
+}
+
+/** The display unit when it is a pressure unit, else mbar. */
+function isPressureUnitDisplay() {
+  return PRESSURE_UNITS.includes(state.displayUnit) ? state.displayUnit : "mbar";
 }
 
 /** @param {any} d */
@@ -840,7 +897,6 @@ async function acquireOpg(d) {
   const has = (/** @type {string} */ c) => Boolean(d.spec.commands?.[c]);
   const read = (/** @type {string} */ c) => (has(c) ? query(d, c, { autoPoll: true }).catch(() => null) : Promise.resolve(null));
   const record = s.activeRecordCommand();
-  if (s.plasma.autoEnabled) await read("plasma_state");
   await read(STATE_FOR_RECORD[record]);
   await read(COUNT_FOR_RECORD[record]);
   const count = s.recordCounts[record];
@@ -964,6 +1020,8 @@ function renderBanner() {
   const region = $("#bannerRegion");
   const banners = [];
   if (document.hidden && state.devices.size) banners.push(h("div.banner", null, "This tab is hidden: browsers throttle timers in background tabs. Polling continues, but gaps may appear; every gap is recorded in the export."));
+  const armed = [...state.devices.values()].filter((d) => d.opg?.plasma.mode === "auto");
+  if (armed.length) banners.push(h("div.banner.bad", { role: "status" }, `Automatic plasma switching is armed on ${armed.map((d) => d.label).join(", ")}: the tool switches the plasma${armed.some((d) => d.opg.plasma.autoStartAlgorithm) ? " and starts the analysis algorithm" : ""} without asking when the pressure crosses a threshold. Every automatic write is logged and exported.`));
   const experimental = [...state.devices.values()].filter((d) => d.experimental);
   if (experimental.length) banners.push(h("div.banner", null, `Experimental model(s) in use: ${experimental.map((d) => d.model).join(", ")}. Treat readings as unverified until the model passes bench acceptance.`));
   replace(region, ...banners);
@@ -1123,7 +1181,7 @@ function openHelp() {
       h("h3", null, "RS485"),
       h("p", null, "Mark the port as RS485, give every gauge on the bus its own address, and use an auto-direction USB-RS485 adapter. All gauges on one bus share one port, and the tool keeps exactly one transaction outstanding at a time. Echoing adapters are handled."),
       h("h3", null, "Safety"),
-      h("p", null, "Every command carries a risk class. Safe reads send immediately; caution commands show the exact bytes; danger commands (adjustments, resets, setpoints, baud rate, turbo actuation) also explain what will happen and need a second click. Changing the display unit never writes to a gauge. Version 1 performs no automatic writes."),
+      h("p", null, "Every command carries a risk class. Safe reads send immediately; caution commands show the exact bytes; danger commands (adjustments, resets, setpoints, baud rate, turbo actuation) also explain what will happen and need a second click. Changing the display unit never writes to a gauge. The only automatic writes are an OPG550's armed automatic plasma switching, which you arm yourself after a danger confirmation; a red banner shows while it is armed."),
       h("h3", null, "Data"),
       h("p", null, "Sessions autosave to this browser's IndexedDB. Export session JSON, a transcript, traffic CSV with exact bytes, and measurement CSV (per device or merged on the union of timestamps). Every export header records the app build, each device's model, address and full scale, and where the full scale came from."),
       h("h3", null, "Terminal"),
@@ -1131,7 +1189,7 @@ function openHelp() {
       h("h3", null, "Setpoints"),
       h("p", null, "For gauges with setpoint relays, the Setpoints button opens an editor. You can drag the switch-on and switch-off lines, drag the shaded band to move both, use the sliders or arrows, or type a pressure. The illustrative pump-down curve shows where each relay would switch and how it holds inside the hysteresis band. Apply sends every change after one confirmation, then reads the values back."),
       h("h3", null, "Spectrum Studio (OPG550)"),
-      h("p", null, "On an OPG550's tab, switch to Spectrum Studio. Switch the plasma on and start SPEC, RoR or RGD (both are confirmed writes); the studio then reads the latest record every 2 s and plots the spectrum, the rate of rise, tracked gases, or the difference between two pressure sources with Δ(A−B) and Δ%. The hover bar under the charts keeps the x value at the far left. The ignition thresholds are shown in the display unit but stored in mbar; when the pressure crosses one, the studio asks you before switching the plasma."),
+      h("p", null, "On an OPG550's tab, switch to Spectrum Studio. Switch the plasma on and start SPEC, RoR or RGD (both are confirmed writes); the studio then reads the latest record every 2 s and plots the spectrum, the rate of rise, tracked gases, or the difference between two pressure sources with Δ(A−B) and Δ%. The hover bar under the charts keeps the x value at the far left. The ignition thresholds are shown in the display unit but stored in mbar. Auto plasma can prompt you when the pressure crosses one, or, once armed, switch the plasma by itself as the desktop tool does."),
       h("h3", null, "Keyboard"),
       h("p", null, h("code", null, "Ctrl K"), " opens the command dictionary for the current device. ", h("code", null, "Enter"), " in the terminal sends."),
       h("div.callout.warn", null, "Items marked 🟠 in the specs (for example the PxG55x CRC and Fixs32en20 decode) come from an OEM document used as a proxy, and still need a bench check against the manufacturer's protocol document.")

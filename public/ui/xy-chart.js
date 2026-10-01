@@ -90,6 +90,14 @@ export class XYChart {
     this.el.remove();
   }
 
+  /** @param {number} height css px */
+  setHeight(height) {
+    if (height === this.height) return;
+    this.height = height;
+    this.canvas.style.height = `${height}px`;
+    this.draw(true);
+  }
+
   get zoomed() {
     return this.view.range != null;
   }
@@ -255,16 +263,50 @@ export class XYChart {
     };
 
     if (model.band && prepared[model.band.a] && prepared[model.band.b]) {
-      const a = toXY(prepared[model.band.a]);
-      const b = toXY(prepared[model.band.b]);
-      if (a.length > 1 && b.length > 1) {
-        ctx.fillStyle = color(model.band.color);
-        ctx.beginPath();
-        a.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        for (let i = b.length - 1; i >= 0; i -= 1) ctx.lineTo(b[i][0], b[i][1]);
-        ctx.closePath();
-        ctx.fill();
+      // Fill between A and B only where both have a drawable value at the same x: B is
+      // interpolated at each of A's points, and the band breaks wherever either is missing.
+      const la = prepared[model.band.a];
+      const lb = prepared[model.band.b];
+      const axisOf = (/** @type {typeof la} */ l) => ((l.axis ?? "left") === "right" && model.right ? [model.right, rightRange] : [model.left, leftRange]);
+      const [axA, rA] = /** @type {[Axis, number[]]} */ (axisOf(la));
+      const [axB, rB] = /** @type {[Axis, number[]]} */ (axisOf(lb));
+      const ok = (/** @type {Axis} */ ax, /** @type {number} */ y) => Number.isFinite(y) && !(ax.scale === "log" && y <= 0);
+      const bp = lb.points;
+      /** @type {[number, number, number][]} */
+      let run = [];
+      const flush = () => {
+        if (run.length > 1) {
+          ctx.fillStyle = color(/** @type {any} */ (model.band).color);
+          ctx.beginPath();
+          run.forEach(([x, ya], i) => (i ? ctx.lineTo(x, ya) : ctx.moveTo(x, ya)));
+          for (let i = run.length - 1; i >= 0; i -= 1) ctx.lineTo(run[i][0], run[i][2]);
+          ctx.closePath();
+          ctx.fill();
+        }
+        run = [];
+      };
+      let j = 0;
+      for (const p of la.points) {
+        if (!ok(axA, p.y)) {
+          flush();
+          continue;
+        }
+        while (j < bp.length && bp[j].x < p.x) j += 1;
+        const b1 = bp[j];
+        const b0 = bp[j - 1];
+        let yb = NaN;
+        if (b1 && b1.x === p.x) yb = b1.y;
+        else if (b0 && b1 && ok(axB, b0.y) && ok(axB, b1.y)) {
+          const f = (p.x - b0.x) / (b1.x - b0.x || 1);
+          yb = axB.scale === "log" ? 10 ** (Math.log10(b0.y) + f * (Math.log10(b1.y) - Math.log10(b0.y))) : b0.y + f * (b1.y - b0.y);
+        }
+        if (!ok(axB, yb)) {
+          flush();
+          continue;
+        }
+        run.push([xOf(p.x), yOf(axA, rA, p.y), yOf(axB, rB, yb)]);
       }
+      flush();
     }
 
     for (const l of prepared) {

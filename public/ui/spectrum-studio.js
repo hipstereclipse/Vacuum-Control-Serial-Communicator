@@ -4,19 +4,23 @@
  * `OPG550SpectrumStudio` workspace. The data model is core/opg/spectrum-studio.js; this module
  * draws it and wires the controls.
  *
- *  Left:  the chart for the chosen main plot (Advanced correlation, Rate of Rise, Raw
- *         spectrum, Tracked gases), each with its own CSV export, and one shared hover bar
- *         whose x reading is always first, at the far left.
- *  Right: plasma ignition (thresholds shown in the display unit, stored and evaluated in
- *         mbar), analysis controls and acquisition, tracked gases, one-shot actions,
- *         telemetry, vacuum regime and device details.
+ *  Toolbar: main plot, the two compared sources and the right-axis gas (Advanced Analysis),
+ *           and the tracked gases as toggle chips.
+ *  Charts:  the chart(s) of the main plot at full width, sized to the window, each with its
+ *           own CSV export, and one shared hover bar whose x reading is always first, at the
+ *           far left.
+ *  Panels:  a grid across the width: plasma ignition (thresholds shown in the display unit,
+ *           stored and evaluated in mbar; auto plasma off, prompt or automatic), acquisition,
+ *           vacuum regime, one-shot actions, telemetry and device details.
  *
- * Nothing here writes to the gauge without a click and the usual confirmation: plasma and
- * algorithm writes go through app.sendCommand / app.writeBatch, and the pressure thresholds
- * only raise a prompt (core/opg/spectrum-studio.js explains the difference from CSC).
+ * Plasma and algorithm writes go through app.sendCommand / app.writeBatch and their
+ * confirmations. The one exception is automatic plasma switching (CSC's auto plasma): it is
+ * armed here through a danger confirmation listing every frame it may send, and the app then
+ * sends those writes by itself (app.js `autoPlasma`).
  */
 import { h, replace, toast, download, formatClock } from "./dom.js";
 import { XYChart, XView } from "./xy-chart.js";
+import { confirmBatch } from "./confirm.js";
 import {
   ALGORITHM_LABELS,
   ANALYSIS_MODES,
@@ -76,6 +80,7 @@ export class SpectrumStudio {
   }
 
   destroy() {
+    window.removeEventListener("resize", this.onResize);
     for (const c of Object.values(this.charts ?? {})) c.destroy();
     this.el.remove();
   }
@@ -201,13 +206,89 @@ export class SpectrumStudio {
     });
     this.gasCard = card("Tracked gas analysis", [scaleToggle("gas"), resetBtn(this.timeView), exportBtn("Export CSV", () => this.exportGas())], [this.charts.gas.el]);
 
-    const left = h("div.studio-charts", null, this.advancedCard, this.trendCard, this.spectrumCard, this.gasCard, this.hoverBar);
-    const right = h("div.studio-side", null, this.buildPlasma(), this.buildAnalysis(), this.buildGases(), this.buildActions(), this.buildHealth(), this.buildTelemetry());
+    // Layout: a toolbar across the top (main plot, comparison sources, tracked gases), the
+    // charts at full width and sized to the window, the hover bar, then the controls in a grid
+    // that fills the width.
+    this.chartsEl = h("div.studio-charts", null, this.advancedCard, this.trendCard, this.spectrumCard, this.gasCard, this.hoverBar);
+    this.armedChip = h("span.chip.bad", { hidden: true, title: "The tool switches the plasma without asking when the pressure crosses a threshold" }, "Auto plasma armed");
     replace(this.el,
       h("div.studio-intro", null,
-        h("div", null, h("h3", null, "Spectrum Studio"), h("p.hint", null, "OPG550 SPEC, RoR and RGD records, analog output, and pressure correlation with the other gauges in this session.")),
+        h("h3", null, "Spectrum Studio"),
+        h("span.hint", null, "OPG550 SPEC, RoR and RGD records, analog output, and pressure correlation with the other gauges in this session."),
+        h("div.grow"),
+        this.armedChip,
         this.d.spec.experimental ? h("span.chip.warn", { title: "P3 V02 record layouts are ported from CSC and not yet checked against the OPG550 communication manual (V13)" }, "record layouts unverified (V13)") : null),
-      h("div.studio-body", null, left, right));
+      this.buildToolbar(),
+      this.chartsEl,
+      h("div.studio-panels", null, this.buildPlasma(), this.buildAcquisition(), this.buildHealth(), this.buildActions(), this.buildTelemetry()));
+    this.onResize = () => this.layoutCharts(true);
+    window.addEventListener("resize", this.onResize);
+  }
+
+  /**
+   * Chart heights follow the window: one visible chart gets most of the viewport, two share it.
+   * @param {boolean} [force]
+   */
+  layoutCharts(force = false) {
+    const vis = this.s.visibility();
+    const shown = Object.values(vis).filter(Boolean).length || 1;
+    const avail = Math.max(360, (window.innerHeight || 900) - 300);
+    const hgt = Math.round(Math.max(shown > 1 ? 240 : 320, Math.min(shown > 1 ? 380 : 620, avail / shown)));
+    const key = `${shown}:${hgt}`;
+    if (!force && key === this.keys.layout) return;
+    this.keys.layout = key;
+    for (const c of Object.values(this.charts)) c.setHeight(hgt);
+  }
+
+  buildToolbar() {
+    const s = this.s;
+    this.modeButtons = h("div.segmented.studio-modes", { role: "group", "aria-label": "Main plot" });
+    for (const m of ANALYSIS_MODES) {
+      this.modeButtons.append(h("button", { type: "button", dataset: { mode: m }, onclick: () => {
+        s.setAnalysisMode(m);
+        this.keys = {};
+        this.clearHover();
+        this.update();
+      } }, m));
+    }
+    this.selectA = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Compare A" }));
+    this.selectB = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Compare B" }));
+    this.selectA.onchange = () => {
+      s.compareA = this.selectA.value;
+      this.update();
+    };
+    this.selectB.onchange = () => {
+      s.compareB = this.selectB.value;
+      this.update();
+    };
+    this.gasSelect = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Right axis gas" }, STUDIO_GASES.map((g) => h("option", { value: g }, g))));
+    this.gasSelect.value = s.correlationGas;
+    this.gasSelect.onchange = () => {
+      s.correlationGas = this.gasSelect.value;
+      this.update();
+    };
+    this.compareRow = h("div.studio-compare", null,
+      h("label.studio-field", null, h("span", null, "Compare A"), this.selectA),
+      h("label.studio-field", null, h("span", null, "Compare B"), this.selectB),
+      h("label.studio-field.narrow", null, h("span", null, "Right axis gas"), this.gasSelect));
+    this.gasChips = {};
+    const chips = h("div.studio-gas-chips", { role: "group", "aria-label": "Track gases" });
+    for (const g of STUDIO_GASES) {
+      const b = /** @type {HTMLButtonElement} */ (h("button.gas-chip", { type: "button", "aria-pressed": String(s.trackedGases.has(g)), onclick: () => {
+        s.setTracked(g, !s.trackedGases.has(g));
+        this.keys = {};
+        this.update();
+      } }, h("span.swatch", { style: { background: GAS_COLORS[/** @type {keyof typeof GAS_COLORS} */ (g)] } }), g));
+      this.gasChips[g] = b;
+      chips.append(b);
+    }
+    this.modeStatus = h("span.hint.studio-mode-status");
+    return h("section.card.studio-toolbar", null,
+      h("div.studio-toolbar-row", null, h("span.studio-label", null, "Main plot"), this.modeButtons, this.compareRow),
+      h("div.studio-toolbar-row", null,
+        h("span.studio-label", { title: "In Raw Spectrum, tracked gases mark their signature lines; in Residual Gas Detection and Advanced Analysis they add the tracked-gas chart" }, "Track gases"),
+        chips,
+        this.modeStatus));
   }
 
   buildPlasma() {
@@ -218,13 +299,21 @@ export class SpectrumStudio {
     const on = h("button.button.small", { type: "button", disabled: !canWrite, onclick: () => this.plasma(1) }, "On…");
     const off = h("button.button.small", { type: "button", disabled: !canWrite, onclick: () => this.plasma(0) }, "Off…");
     const read = h("button.button.small", { type: "button", disabled: !this.has("plasma_state"), onclick: () => this.app.sendCommand(d, "plasma_state", undefined) }, "Read");
-    const auto = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: this.s.plasma.autoEnabled, disabled: !(canWrite && this.has("plasma_state")) }));
-    auto.onchange = () => {
-      this.s.setPlasmaSettings({ autoEnabled: auto.checked });
+    const canAuto = canWrite && this.has("plasma_state");
+    this.plasmaModes = h("div.segmented.studio-plasma-modes", { role: "group", "aria-label": "Auto plasma" });
+    for (const [mode, label, title] of [
+      ["off", "Off", "Thresholds are not evaluated"],
+      ["prompt", "Prompt me", "When the pressure crosses a threshold, the studio asks you to switch the plasma"],
+      ["auto", "Automatic…", "CSC's auto plasma: the tool switches the plasma itself. Needs arming."]
+    ]) {
+      this.plasmaModes.append(h("button", { type: "button", dataset: { mode }, title, disabled: !canAuto, onclick: () => this.setPlasmaMode(/** @type {any} */ (mode)) }, label));
+    }
+    this.autoStartBox = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: this.s.plasma.autoStartAlgorithm }));
+    this.autoStartBox.onchange = () => {
+      this.s.setPlasmaSettings({ autoStartAlgorithm: this.autoStartBox.checked });
       this.app.savePlasmaSettings(this.s);
-      if (auto.checked && this.has("plasma_state")) this.app.query(d, "plasma_state").catch(() => {});
-      this.update();
     };
+    this.armedNote = h("div");
     this.minInput = /** @type {HTMLInputElement} */ (h("input", { type: "text", inputmode: "decimal", "aria-label": "Minimum ignition pressure", spellcheck: false }));
     this.maxInput = /** @type {HTMLInputElement} */ (h("input", { type: "text", inputmode: "decimal", "aria-label": "Maximum safe pressure", spellcheck: false }));
     this.minUnit = h("span.hint");
@@ -244,49 +333,63 @@ export class SpectrumStudio {
     };
     bindThreshold(this.minInput, "minMbar");
     bindThreshold(this.maxInput, "maxMbar");
-    return h("section.card.studio-side-card", null,
+    return h("section.card.studio-side-card.studio-plasma", null,
       h("h3.card-title", null, "Plasma ignition"),
       this.plasmaStatus,
       h("div.row", null, on, off, read),
       this.plasmaPrompt,
-      h("label.row.studio-check", null, auto, "Prompt me from the pressure (auto plasma)"),
       h("div.studio-thresholds", null,
         h("span.studio-label", null, "Min ignite"), h("div.row", null, this.minInput, this.minUnit),
-        h("span.studio-label", null, "Max safe"), h("div.row", null, this.maxInput, this.maxUnit)),
-      h("p.hint.studio-note", null, "Thresholds are shown in the display unit and stored and evaluated in mbar. CSC switches the plasma by itself; this tool never writes on its own, so it prompts you instead."));
+        h("span.studio-label", null, "Max safe"), h("div.row", null, this.maxInput, this.maxUnit),
+        h("span.studio-label", null, "Auto plasma"), this.plasmaModes),
+      h("label.row.studio-check", null, this.autoStartBox, "In automatic mode, start the main plot's algorithm after the plasma ignites (as CSC does)"),
+      this.armedNote,
+      h("p.hint.studio-note", null, "Thresholds are shown in the display unit and stored and evaluated in mbar, with a 5 s cooldown between actions. Automatic mode is never restored after a reload."));
   }
 
-  buildAnalysis() {
+  /**
+   * Off and prompt apply at once. Automatic is CSC's behaviour and writes without asking, so it
+   * is armed through a danger confirmation listing every frame it may send.
+   * @param {"off" | "prompt" | "auto"} mode
+   */
+  async setPlasmaMode(mode) {
     const s = this.s;
-    this.modeSelect = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Main plot" }, ANALYSIS_MODES.map((m) => h("option", { value: m }, m))));
-    this.modeSelect.value = s.analysisMode;
-    this.modeSelect.onchange = () => {
-      s.setAnalysisMode(this.modeSelect.value);
-      this.keys = {};
-      this.clearHover();
-      this.update();
-    };
-    this.selectA = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Compare A" }));
-    this.selectB = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Compare B" }));
-    this.selectA.onchange = () => {
-      s.compareA = this.selectA.value;
-      this.update();
-    };
-    this.selectB.onchange = () => {
-      s.compareB = this.selectB.value;
-      this.update();
-    };
-    this.gasSelect = /** @type {HTMLSelectElement} */ (h("select", { "aria-label": "Right axis gas" }, STUDIO_GASES.map((g) => h("option", { value: g }, g))));
-    this.gasSelect.value = s.correlationGas;
-    this.gasSelect.onchange = () => {
-      s.correlationGas = this.gasSelect.value;
-      this.update();
-    };
-    this.compareRows = h("div.studio-form", null,
-      h("label", null, "Compare A"), this.selectA,
-      h("label", null, "Compare B"), this.selectB,
-      h("label", null, "Right axis gas"), this.gasSelect);
-    this.modeStatus = h("p.hint");
+    const d = this.d;
+    if (mode === s.plasma.mode) return;
+    if (mode === "auto") {
+      const u = this.unit();
+      const fmt = (/** @type {number} */ mbar) => `${formatSci(convertPressure(mbar, "mbar", u), 2)} ${u}`;
+      const enable = ENABLE_FOR_RECORD[s.activeRecordCommand()];
+      /** @type {{ command: string, label: string, value: any, bytes: Uint8Array }[]} */
+      const items = [
+        { command: "plasma_enable", label: `Plasma off, when the pressure rises above ${fmt(s.plasma.maxMbar)}`, value: 0, bytes: d.codec.buildRequest("plasma_enable", 0) },
+        { command: "plasma_enable", label: `Plasma on, when the pressure falls below ${fmt(s.plasma.minMbar)}`, value: 1, bytes: d.codec.buildRequest("plasma_enable", 1) }
+      ];
+      if (s.plasma.autoStartAlgorithm) {
+        if (this.has("all_algorithms_off")) items.push({ command: "all_algorithms_off", label: "After ignition: all algorithms off", value: 0, bytes: d.codec.buildRequest("all_algorithms_off", 0) });
+        if (this.has(enable)) items.push({ command: enable, label: `After ignition: start ${ALGORITHM_LABELS[enable]} (the algorithm of the main plot at that moment)`, value: 1, bytes: d.codec.buildRequest(enable, 1) });
+      }
+      const ok = await confirmBatch({
+        title: `Arm automatic plasma switching on ${d.label}`,
+        device: d.label,
+        risk: "danger",
+        description: "From now on the tool sends these frames by itself, without asking, whenever the OPG550's pressure crosses a threshold (at most once every 5 s). Every automatic write is logged with its exact bytes and appears in the exports. It stays armed until you choose Off or Prompt me, remove the gauge, or reload the page.",
+        warning: "Switching the plasma changes the gauge and what it measures. Make sure nothing in the process relies on the plasma state before arming.",
+        items,
+        notes: [d.spec.notes?.plasma_enable].filter(Boolean),
+        source: d.spec.source,
+        confirmLabel: "Arm automatic switching"
+      });
+      if (!ok) return this.update();
+    }
+    s.setPlasmaSettings({ mode });
+    this.app.savePlasmaSettings(s);
+    if (mode !== "off" && this.has("plasma_state")) this.app.query(d, "plasma_state").catch(() => {});
+    toast(mode === "auto" ? `Automatic plasma switching armed on ${d.label}.` : mode === "prompt" ? "Auto plasma will prompt you." : "Auto plasma off.", mode === "auto" ? "warn" : "ok");
+    this.update();
+  }
+
+  buildAcquisition() {
     this.acqStatus = h("div.studio-acq-status");
     this.startButton = /** @type {HTMLButtonElement} */ (h("button.button.small.primary", { type: "button", onclick: () => this.startAlgorithm() }, "Start"));
     const stop = h("button.button.small", { type: "button", disabled: !this.has("all_algorithms_off"), onclick: () => this.stopAlgorithms() }, "Stop all…");
@@ -296,31 +399,10 @@ export class SpectrumStudio {
       this.update();
     };
     return h("section.card.studio-side-card", null,
-      h("h3.card-title", null, "Analysis"),
-      h("div.studio-form", null, h("label", null, "Main plot"), this.modeSelect),
-      this.compareRows,
-      this.modeStatus,
-      h("div.studio-subtitle", null, "Acquisition"),
+      h("h3.card-title", null, "Acquisition"),
       this.acqStatus,
       h("div.row", null, this.startButton, stop),
       h("label.row.studio-check", null, acquire, "Read state, record count and the latest record every 2 s (reads only)"));
-  }
-
-  buildGases() {
-    this.gasBoxes = {};
-    const grid = h("div.studio-gases");
-    for (const g of STUDIO_GASES) {
-      const box = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: this.s.trackedGases.has(g) }));
-      box.onchange = () => {
-        this.s.setTracked(g, box.checked);
-        this.keys = {};
-        this.update();
-      };
-      this.gasBoxes[g] = box;
-      grid.append(h("label.studio-gas", null, box, h("span.swatch", { style: { background: GAS_COLORS[/** @type {keyof typeof GAS_COLORS} */ (g)] } }), g));
-    }
-    return h("section.card.studio-side-card", null, h("h3.card-title", null, "Track gases"), grid,
-      h("p.hint.studio-note", null, "In Raw Spectrum, tracked gases mark their signature lines; in Residual Gas Detection and Advanced Analysis they add the tracked-gas chart."));
   }
 
   buildActions() {
@@ -571,9 +653,11 @@ export class SpectrumStudio {
     this.trendCard.hidden = !vis.trend;
     this.spectrumCard.hidden = !vis.spectrum;
     this.gasCard.hidden = !vis.gas;
-    this.compareRows.hidden = s.analysisMode !== "Advanced Analysis";
-    if (this.modeSelect.value !== s.analysisMode) this.modeSelect.value = s.analysisMode;
+    this.compareRow.hidden = s.analysisMode !== "Advanced Analysis";
+    for (const b of this.modeButtons.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.mode === s.analysisMode));
+    for (const [g, b] of Object.entries(this.gasChips)) b.setAttribute("aria-pressed", String(s.trackedGases.has(g)));
     setText(this.modeStatus, s.modeStatus);
+    this.layoutCharts();
 
     if (vis.advanced) this.updateAdvanced();
     if (vis.trend) setText(this.rorLine, s.gaugeRorText ? `Gauge-reported ${s.gaugeRorText.text.replace(/^RoR active; /, "")}` : "dP/dt is computed from consecutive spike-filtered OPG550 readings; the dashed line is the pressure on the right axis.");
@@ -634,6 +718,19 @@ export class SpectrumStudio {
       this.maxInput.value = formatSci(s.thresholdIn("maxMbar", u), 2);
       setText(this.minUnit, u);
       setText(this.maxUnit, u);
+    }
+    for (const b of this.plasmaModes.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.mode === p.mode));
+    this.autoStartBox.disabled = p.mode === "auto";
+    this.armedChip.hidden = p.mode !== "auto";
+    const armedKey = `${p.mode}|${p.lastAuto?.t}|${p.lastAuto?.result}|${u}`;
+    if (armedKey !== this.keys.armed) {
+      this.keys.armed = armedKey;
+      const last = p.lastAuto;
+      replace(this.armedNote, p.mode !== "auto" ? null : h("div.callout.danger.studio-prompt", { role: "status" },
+        h("div", null, h("strong", null, "Automatic switching is armed. "),
+          `The tool switches the plasma off above ${formatSci(s.thresholdIn("maxMbar", u), 2)} ${u} and on below ${formatSci(s.thresholdIn("minMbar", u), 2)} ${u} without asking${p.autoStartAlgorithm ? ", then starts the main plot's algorithm" : ""}.`),
+        last ? h("div.hint", null, `Last automatic action ${formatClock(last.t).slice(0, 8)}: plasma ${last.action} (${last.reason}), ${last.result}.`) : null,
+        h("div.row", null, h("button.button.small", { type: "button", onclick: () => this.setPlasmaMode("prompt") }, "Disarm (prompt me instead)"))));
     }
     const prompt = p.prompt;
     const promptKey = prompt ? `${prompt.action}|${prompt.t}|${u}` : "";

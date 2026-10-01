@@ -4,7 +4,7 @@ export const dynamic = "force-static";
 
 // Files in public/ are not content-hashed by the static export. Bump this with every deploy
 // so the page and the client modules stay in lockstep.
-const publicClientVersion = "20260930-brand-terminal-setpoints";
+const publicClientVersion = "20260930-spectrum-studio-auto-plasma-layout";
 
 function Icon({ name, size = 18 }) {
   const paths = {

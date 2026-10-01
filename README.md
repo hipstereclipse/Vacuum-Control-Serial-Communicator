@@ -25,7 +25,8 @@ The design, the sources behind every protocol figure and the open verification i
   - *Residual Gas Detection:* tracked-gas partial pressures.
   - *Advanced Analysis:* any two pressure sources in the session, with the band between them and a gas partial pressure on the right axis.
 
-  One hover bar keeps the x value at the far left and shows Δ(A−B) and Δ% at the cursor. Every history covers the whole session. Plasma on or off and starting SPEC, RoR or RGD are confirmed writes; after that the studio reads the latest record every 2 s. Ignition thresholds are shown in the display unit but stored and evaluated in mbar. When the pressure crosses one, the studio prompts you rather than switching the plasma itself. Exports: CSC's RGD and RoR CSV layout, plus one CSV per chart.
+  One hover bar keeps the x value at the far left and shows Δ(A−B) and Δ% at the cursor. Every history covers the whole session. Plasma on or off and starting SPEC, RoR or RGD are confirmed writes; after that the studio reads the latest record every 2 s. Ignition thresholds are shown in the display unit but stored and evaluated in mbar. Auto plasma can be off, prompt you when the pressure crosses a threshold, or switch the plasma automatically as the desktop tool does. Automatic mode has to be armed through a danger confirmation, shows a red banner while armed, logs every automatic write, and is not restored after a reload. Exports: CSC's RGD and RoR CSV layout, plus one CSV per chart.
+- **Layout:** the device list and the Add gauge / Simulate buttons stay fixed on the left; only the workspace on the right scrolls. Scan results and the Simulate dialog's model list support multi-select: click, Ctrl-click, Shift-click, drag, or the checkboxes.
 - **Combined view** in overlay, stacked or grid layout, with visibility toggles, per-device colours and synchronised navigation.
 - **Sessions** autosave to this browser's IndexedDB, and can be exported and imported as JSON.
 - **Exports:** measurement CSV (per device, or merged on the union of timestamps), traffic CSV with exact bytes, a readable transcript, and session JSON. Every export header records the build, each device's model, address and full scale, and where the full scale came from.
@@ -36,7 +37,7 @@ The design, the sources behind every protocol figure and the open verification i
   - *caution:* shows the exact bytes first.
   - *danger:* explains what will happen, lists the preconditions and the source document, and needs a second click.
 
-  Changing the display unit never writes to a gauge, and the tool performs no automatic writes.
+  Changing the display unit never writes to a gauge. The only automatic writes come from an OPG550's automatic plasma switching, and only after you arm it.
 
 ## Device support
 

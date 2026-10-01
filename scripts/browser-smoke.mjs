@@ -131,11 +131,7 @@ try {
     [...document.querySelectorAll(".view-switch button")].find((b) => b.textContent === "Spectrum Studio")?.click();
     await pauseIn(600);
     const studio = document.querySelector(".studio");
-    const main = studio?.querySelector('select[aria-label="Main plot"]');
-    if (main) {
-      main.value = "Advanced Analysis";
-      main.dispatchEvent(new Event("change"));
-    }
+    [...(studio?.querySelectorAll(".studio-modes button") ?? [])].find((b) => b.textContent === "Advanced Analysis")?.click();
     await pauseIn(700);
     const studioCanvas = [...(studio?.querySelectorAll(".xy-canvas") ?? [])].find((c) => c.offsetParent && c.width > 0);
     const compareOptions = studio?.querySelector('select[aria-label="Compare B"]')?.options.length ?? 0;

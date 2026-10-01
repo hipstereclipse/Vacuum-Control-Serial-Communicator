@@ -8,6 +8,7 @@ import { h, replace, openDialog, closeDialog, toast } from "./dom.js";
 import { scanPort, sweepAddresses } from "../core/scan/scanner.js";
 import { Registry, FAMILY_LABELS } from "../core/registry/registry.js";
 import { CDG_FULL_SCALE_OPTIONS_MBAR, DEFAULT_POLL_INTERVAL_MS } from "../core/constants.js";
+import { bindRowSelection } from "./multi-select.js";
 
 const TORR_MBAR = 1.33322;
 /** Full-scale options in the unit the head is calibrated in, from CSC's canonical mbar list. */
@@ -151,11 +152,8 @@ export function openAddGauge(app) {
       return;
     }
 
-    let lastClickIndex = -1;
-
-    const rowMap = new Map();
-    const rows = results.map((r, idx) => {
-      const box = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: r.selected }));
+    const rows = results.map((r) => {
+      const box = /** @type {HTMLInputElement} */ (h("input", { type: "checkbox", checked: r.selected, "aria-label": `Select ${r.modelHint ?? "result"}` }));
       const row = h("tr", null,
         h("td", null, box),
         h("td", null, r.portLabel),
@@ -163,64 +161,26 @@ export function openAddGauge(app) {
         h("td", null, `${r.baudRate} baud`, r.rsMode === "RS485" ? ` · addr ${r.address}` : ""),
         h("td.hint", null, r.description),
         h("td", null, r.family === "cdg_serial" ? (r.fullScaleConfident ? h("span.chip.ok", null, `FS≈${r.fullScaleMbar} mbar`) : h("span.chip.warn", null, "FS unknown")) : ""));
-
-      rowMap.set(idx, { row, box });
-      row.classList.toggle("selected", r.selected);
-
-      row.onmousedown = (e) => {
-        if (e.button !== 0) return;
-
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd+click: toggle individual item
-          r.selected = !r.selected;
-          lastClickIndex = idx;
-        } else if (e.shiftKey && lastClickIndex >= 0) {
-          // Shift+click: select range
-          const [start, end] = lastClickIndex < idx ? [lastClickIndex, idx] : [idx, lastClickIndex];
-          for (let i = start; i <= end; i++) results[i].selected = true;
-          lastClickIndex = idx;
-        } else {
-          // Regular click: select only this item (unless dragging)
-          results.forEach((x, i) => x.selected = i === idx);
-          lastClickIndex = idx;
-        }
-
-        updateAllRows();
-      };
-
-      row.onmouseover = (e) => {
-        // Click and drag: select range from last click to current
-        if (e.buttons === 1 && lastClickIndex >= 0 && lastClickIndex !== idx) {
-          const [start, end] = lastClickIndex < idx ? [lastClickIndex, idx] : [idx, lastClickIndex];
-          results.forEach((x, i) => x.selected = i >= start && i <= end);
-          updateAllRows();
-        }
-      };
-
-      box.onchange = () => {
-        r.selected = box.checked;
-        row.classList.toggle("selected", r.selected);
-      };
-
-      return row;
+      return { row, box };
     });
-
-    const updateAllRows = () => {
-      rowMap.forEach(({ row, box }, idx) => {
-        const isSelected = results[idx].selected;
-        row.classList.toggle("selected", isSelected);
-        box.checked = isSelected;
-      });
+    const use = /** @type {HTMLButtonElement} */ (h("button.button", { type: "button", onclick: () => {
+      for (const r of results.filter((x) => x.selected)) configs.push(configFromResult(app, r));
+      results = results.filter((x) => !x.selected);
+      renderResults();
+      renderConfigs();
+    } }));
+    const count = () => {
+      const n = results.filter((x) => x.selected).length;
+      use.textContent = n > 1 ? `Use ${n} selected ↓` : "Use selected ↓";
+      use.disabled = n === 0;
     };
+    bindRowSelection(rows, results, count);
+    count();
 
     replace(resultsBox,
-      h("div.scroll", null, h("table.data", null, h("thead", null, h("tr", null, h("th", null, ""), h("th", null, "Port"), h("th", null, "Found"), h("th", null, "Line"), h("th", null, "Details"), h("th", null, ""))), h("tbody", null, rows))),
-      h("div.row", { style: { marginTop: "8px" } }, h("button.button", { type: "button", onclick: () => {
-        for (const r of results.filter((x) => x.selected)) configs.push(configFromResult(app, r));
-        results = results.filter((x) => !x.selected);
-        renderResults();
-        renderConfigs();
-      } }, "Use selected ↓")));
+      h("div.scroll", null, h("table.data", null, h("thead", null, h("tr", null, h("th", null, ""), h("th", null, "Port"), h("th", null, "Found"), h("th", null, "Line"), h("th", null, "Details"), h("th", null, ""))), h("tbody", null, rows.map((r) => r.row)))),
+      h("div.row", { style: { marginTop: "8px" } }, use,
+        h("span.hint", null, "Click a row to select it, Ctrl-click to add or remove one, Shift-click or drag to select a range.")));
   }
 
   function renderConfigs() {
